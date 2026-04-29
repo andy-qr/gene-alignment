@@ -47,7 +47,6 @@ def fill_descriptions(df, base):
             time.sleep(wait)
  
     tqdm.write("\r" + " " * 80 + "\r", end="")
-    print("✓ Descriptions des LOCs récupérées")
  
     df_ncbi = pd.DataFrame(results)
     df = df.merge(df_ncbi[["gene_id", "symbol_ncbi", "description"]], on="gene_id", how="left")
@@ -60,7 +59,7 @@ def fill_descriptions(df, base):
  
     cols = df.columns.tolist()
     cols.remove("description")
-    cols.insert(3, "description")
+    cols.insert(4, "description")
     df = df[cols]
  
     return df

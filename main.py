@@ -3,8 +3,8 @@ BASE = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 TAXON = "Columba livia"
 TAXON_REF = "Homo sapiens"
 
-get_descriptions = False
-get_symbols = False
+get_descriptions = True
+get_symbols = True
 get_all_ids = True
 
 import os

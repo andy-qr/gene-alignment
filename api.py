@@ -1,4 +1,5 @@
 from itertools import cycle
+import threading
  
 api_keys = [
     "6aa784ef049697c8d1801ce03dd5b1344908",
@@ -6,9 +7,12 @@ api_keys = [
     "00467ee59fa0c04894a15ab97c75ec6b5f09",
 ]
  
-wait = 0.11 / len(api_keys)
+wait = 0.11
  
+
 _key_cycle = cycle(api_keys)
+_lock = threading.Lock()
  
 def get_next_key():
-    return next(_key_cycle)
+    with _lock:
+        return next(_key_cycle)
