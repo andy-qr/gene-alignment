@@ -4,7 +4,7 @@ TAXON = "Columba livia"
 TAXON_REF = "Homo sapiens"
 
 get_descriptions = True
-get_symbols = True
+get_symbols = False
 get_all_ids = True
 
 import os
@@ -18,7 +18,6 @@ df.drop(columns="gene_name", inplace=True)
 df["gene_symbol"] = df.apply(
     lambda r:
     "" if r["gene_id"][:3] == "LOC" and r["gene_biotype"] == "protein_coding"
-    else "uncharacterized " + r["gene_id"] if r["gene_id"][:3] == "LOC"
     else r["gene_id"],
     axis=1
 )
