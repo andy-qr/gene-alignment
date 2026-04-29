@@ -3,7 +3,7 @@ BASE = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 TAXON = "Columba livia"
 TAXON_REF = "Homo sapiens"
 
-get_descriptions = True
+get_descriptions = False
 get_symbols = False
 get_all_ids = True
 
@@ -58,5 +58,5 @@ else :
 if get_all_ids:
     from all_ids import fill_all_ids
     df = fill_all_ids(df, BASE, TAXON)
-    print(f"All gene NCBI ids obtained")
+    print(f"All NCBI gene ids obtained")
     df.to_csv("S:/INSERM/Pipeline/Blasto_vs_fibro_final.txt", sep="\t", index=False)

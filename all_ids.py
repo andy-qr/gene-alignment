@@ -8,7 +8,7 @@ from api import get_next_key, wait
 
 
 def fill_all_ids(df, base, taxon):
-    df["ncbi_id"] = df["ncbi_id"]
+    df["ncbi_id"] = df["ncbi_id"].fillna("").astype(str)
     mask_missing = (df["ncbi_id"] == "")
     non_loc_symbols = df.loc[mask_missing, "gene_id"].tolist()
 
@@ -41,10 +41,10 @@ def fill_all_ids(df, base, taxon):
     with tqdm(total=len(non_loc_symbols), desc="Searching for NCBI ids", unit="gene",
             bar_format="{desc}: {n}/{total} |{bar}|",
             ascii="░▒▓█", leave=False) as pbar:
-        for i in range(0, len(non_loc_symbols), 1000):
+        for i in range(0, len(non_loc_symbols), 100):
             batch = non_loc_symbols[i:i + 100]
             symbol_to_id.update(fetch_ids_batch(batch))
             pbar.update(len(batch))
-            time.sleep(0.11)
+            time.sleep(wait)
     df.loc[mask_missing, "ncbi_id"] = df.loc[mask_missing, "gene_id"].map(symbol_to_id)
     return df
