@@ -25,7 +25,7 @@ for i, key in enumerate(api_keys):
 
 thread_key_cycles = {idx: cycle(keys) for idx, keys in thread_key_lists.items()}
 
-wait = 0.1
+default_wait = 0.11
 
 thread_local = threading.local()
 
@@ -38,6 +38,6 @@ def get_thread_key():
             idx = 0
         keys = thread_key_lists[idx]
         thread_local.cycle = cycle(keys)
-        thread_local.wait = 0.1 / len(keys)
-        time.sleep(idx * 0.1)
+        thread_local.wait = default_wait / len(keys)
+        time.sleep(idx * default_wait)
     return next(thread_local.cycle), thread_local.wait
