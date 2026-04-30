@@ -9,10 +9,11 @@ else:
 
 TAXON_REF = "Homo sapiens"
 NCBI = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
+UNIPROT = "https://rest.uniprot.org/uniprotkb/search"
 
-get_descriptions = True
+get_descriptions = False
 get_symbols = True
-get_all_ids = True
+get_all_ids = False
 
 
 import pandas as pd
@@ -59,7 +60,7 @@ else:
 
 if get_symbols:
     from symbols import fill_symbols
-    df = fill_symbols(df, NCBI, TAXON_REF)
+    df = fill_symbols(df, UNIPROT, TAXON_REF)
     print(f"LOC genes symbols obtained")
     df.to_csv("S:/INSERM/Pipeline/"+FILE+"_symbols.txt", sep="\t", index=False)
 else :

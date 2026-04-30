@@ -1,146 +1,99 @@
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
+from difflib import SequenceMatcher
 import threading
 import requests
 import time
 import os
-import re
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
-from api import get_thread_key, num_threads
+from api import num_threads, default_wait
 
+UNIPROT_URL = "https://rest.uniprot.org/uniprotkb/search"
+BATCH_SIZE = 20
 
 def fill_symbols(df, base, taxon_ref):
+    total_matched = 0
+    matched_lock = threading.Lock()
 
-    def clean_description(description):
-        suffixes_espaces = [" homolog", " ortholog"]
-        suffixes_tiret = ["like", "related"]
-        
-        for suffix in suffixes_espaces:
-            description = description.replace(suffix, "")
-        
-        words = description.split()
-        cleaned_words = []
-        for word in words:
-            if "-" in word:
-                parts = word.split("-")
-                if parts[-1].lower() in suffixes_tiret:
-                    word = "-".join(parts[:-1])
-            cleaned_words.append(word)
-        
-        return " ".join(cleaned_words).strip()
+    def similarity(a, b):
+        return SequenceMatcher(None, a.lower(), b.lower()).ratio()
 
-    def get_symbol_from_description(description, taxon=taxon_ref):
-        if not description or "uncharacterized" in description.lower():
-            return "", 0
-        api_key, wait = get_thread_key()
-        clean = clean_description(description)
-
-        symbol_match = re.search(r'\b([A-Z][A-Z0-9]{1,9})\b', description)
-        if symbol_match:
-            candidate = symbol_match.group(1)
-            try:
-                search_r = requests.get(f"{base}/esearch.fcgi", params={
-                    "db":      "gene",
-                    "term":    f'{candidate}[Gene Name] AND "{taxon}"[Organism]',
-                    "retmax":  1,
-                    "retmode": "json",
-                    "api_key": api_key
-                }, timeout=10)
-                ids = search_r.json().get("esearchresult", {}).get("idlist", [])
-                if ids:
-                    summary_r = requests.get(f"{base}/esummary.fcgi", params={
-                        "db":      "gene",
-                        "id":      ids[0],
-                        "retmode": "json",
-                        "api_key": api_key
-                    }, timeout=10)
-                    info = summary_r.json().get("result", {}).get(ids[0], {})
-                    symbol = info.get("name", "")
-                    if symbol and not symbol.startswith("LOC"):
-                        return symbol, wait
-            except Exception:
-                pass
-
+    def fetch_single(description):
         try:
-            search_r = requests.get(f"{base}/esearch.fcgi", params={
-                "db":      "gene",
-                "term":    f'"{clean}"[Gene Description] AND "{taxon}"[Organism]',
-                "retmax":  1,
-                "retmode": "json",
-                "api_key": api_key
+            response = requests.get(UNIPROT_URL, params={
+                "query":  f'protein_name:"{description}" AND reviewed:true AND organism_id:9606',
+                "fields": "gene_names,protein_name",
+                "format": "json",
+                "size":   5
             }, timeout=10)
-            ids = search_r.json().get("esearchresult", {}).get("idlist", [])
-            if ids:
-                summary_r = requests.get(f"{base}/esummary.fcgi", params={
-                    "db":      "gene",
-                    "id":      ids[0],
-                    "retmode": "json",
-                    "api_key": api_key
-                }, timeout=10)
-                info = summary_r.json().get("result", {}).get(ids[0], {})
-                symbol = info.get("name", "")
-                if symbol and not symbol.startswith("LOC"):
-                    return symbol, wait
-        except Exception:
-            pass
+            results = response.json().get("results", [])
+            
+            best_symbol = ""
+            best_score = 0
 
-        try:
-            search_r = requests.get(f"{base}/esearch.fcgi", params={
-                "db":      "gene",
-                "term":    f'"{clean}"[All Fields] AND "{taxon}"[Organism]',
-                "retmax":  1,
-                "retmode": "json",
-                "api_key": api_key
-            }, timeout=10)
-            ids = search_r.json().get("esearchresult", {}).get("idlist", [])
-            if not ids:
-                return "", 0
-            summary_r = requests.get(f"{base}/esummary.fcgi", params={
-                "db":      "gene",
-                "id":      ids[0],
-                "retmode": "json",
-                "api_key": api_key
-            }, timeout=10)
-            info = summary_r.json().get("result", {}).get(ids[0], {})
-            symbol = info.get("name", "")
-            return ("", 0) if symbol.startswith("LOC") else (symbol, wait)
+            for r in results:
+                if r.get("entryType") != "UniProtKB reviewed (Swiss-Prot)":
+                    continue
+                genes = r.get("genes", [])
+                symbol = genes[0].get("geneName", {}).get("value", "").upper() if genes else ""
+                if not symbol or symbol.startswith("LOC"):
+                    continue
+
+                all_names = []
+                desc = r.get("proteinDescription", {})
+                rec = desc.get("recommendedName", {})
+                if rec:
+                    all_names.append(rec.get("fullName", {}).get("value", ""))
+                for alt in desc.get("alternativeNames", []):
+                    all_names.append(alt.get("fullName", {}).get("value", ""))
+
+                # Prendre le meilleur score de similarité parmi tous les noms
+                score = max((similarity(description, name) for name in all_names), default=0)
+                if score > best_score:
+                    best_score = score
+                    best_symbol = symbol
+
+            time.sleep(default_wait)
+            # Seuil minimum de similarité
+            return best_symbol if best_score >= 0.4 else "", best_score
+
         except Exception as e:
             tqdm.write(f"  Erreur: {e}")
+            time.sleep(default_wait)
             return "", 0
 
     mask = df["gene_symbol"].str.startswith("LOC") & ~df["description"].str.startswith("uncharacterized")
-    desc_unique = df.loc[mask, "description"].dropna().unique()
+    desc_unique = df.loc[mask, "description"].dropna().astype(str).unique()
 
     cache = {}
     cache_lock = threading.Lock()
 
     def process_desc(args):
         i, desc = args
-        symbol, wait = get_symbol_from_description(desc)
-        time.sleep(wait)
+        symbol, score = fetch_single(desc)
         with cache_lock:
             cache[desc] = symbol
-        return i
+        return i, bool(symbol)
 
-    with tqdm(total=len(desc_unique), desc="Searching for NCBI symbols", unit="description",
-            bar_format="{desc}: {n}/{total} |{bar}|",
-            ascii="░▒▓█", leave=False) as pbar:
+    with tqdm(total=len(desc_unique), desc="Searching UniProt symbols", unit="description",
+              bar_format="{desc}: {n}/{total} |{bar}|",
+              ascii="░▒▓█", leave=False) as pbar:
         with ThreadPoolExecutor(max_workers=num_threads) as executor:
-            for i in executor.map(process_desc, enumerate(desc_unique)):
+            futures = {executor.submit(process_desc, args): args for args in enumerate(desc_unique)}
+            for future in as_completed(futures):
+                i, matched = future.result()
+                with matched_lock:
+                    total_matched += matched
                 pbar.update(1)
-                if (i + 1) % 100 == 0:
-                    with cache_lock:
-                        df.loc[mask, "gene_symbol"] = df.loc[mask, "description"].map(cache)
-                    df["gene_symbol"] = df["gene_symbol"].fillna("")
-                    df.to_csv("S:/INSERM/Pipeline/blasto_vs_fibro_symbols_temp.txt", sep="\t", index=False)
+        pbar.n = pbar.total
+        pbar.refresh()
 
+    print(f"✓ {total_matched}/{len(desc_unique)} symbols résolus via UniProt Swiss-Prot")
 
-    df.loc[mask, "gene_symbol"] = df.loc[mask, "description"].map(cache)
+    df.loc[mask, "gene_symbol"] = df.loc[mask, "description"].map(cache).fillna("")
     df["gene_symbol"] = df.apply(
-        lambda r:
-        r["gene_symbol"] if r["gene_symbol"] else r["gene_id"],
+        lambda r: r["gene_symbol"] if r["gene_symbol"] else r["gene_id"],
         axis=1
     )
-
     return df
