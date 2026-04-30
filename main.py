@@ -3,7 +3,7 @@ TAXON = "Columba livia"
 TAXON_REF = "Homo sapiens"
 
 get_descriptions = True
-get_symbols = False
+get_symbols = True
 get_all_ids = True
 
 import os

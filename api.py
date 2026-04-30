@@ -2,14 +2,20 @@ from itertools import cycle
 import threading
 import time
 import os
+
+
+def load_keys(filepath="api.env"):
+    keys = []
+    with open(filepath) as f:
+        for line in f:
+            line = line.strip()
+            if line and "=" in line:
+                keys.append(line.split("=", 1)[1])
+    return keys
+
+api_keys = load_keys()
  
-api_keys = [
-    "6aa784ef049697c8d1801ce03dd5b1344908",
-    "99a5eb22f29477dc1049ad12fd597780d608",
-    "00467ee59fa0c04894a15ab97c75ec6b5f09",
-    "c90890031a8a16e49fe34ff07a793f5aff08"
-]
- 
+
 physical_cores = os.cpu_count() or 4
 num_threads = min(len(api_keys), max(1, int(physical_cores * 3 / 4)))
 
@@ -22,6 +28,7 @@ thread_key_cycles = {idx: cycle(keys) for idx, keys in thread_key_lists.items()}
 wait = 0.1
 
 thread_local = threading.local()
+
 
 def get_thread_key():
     if not hasattr(thread_local, "cycle"):
