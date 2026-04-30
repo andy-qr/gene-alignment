@@ -1,6 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from tqdm import tqdm
 from difflib import SequenceMatcher
+from tqdm import tqdm
 import threading
 import requests
 import time
@@ -9,28 +9,65 @@ import os
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 from api import num_threads, default_wait
 
-UNIPROT_URL = "https://rest.uniprot.org/uniprotkb/search"
-BATCH_SIZE = 20
+THRESHOLD = 0.25
+SIZE = 5
+
 
 def fill_symbols(df, base, taxon_ref):
     total_matched = 0
     matched_lock = threading.Lock()
 
     def similarity(a, b):
-        return SequenceMatcher(None, a.lower(), b.lower()).ratio()
+        a = a.lower().replace("-", " ")
+        b = b.lower().replace("-", " ")
+        return SequenceMatcher(None, a, b).ratio()
 
-    def fetch_single(description):
+    def clean_description(description):
+        # Supprimer les suffixes avec espaces
+        suffixes_espaces = [" associated", " like", " related"]
+        for suffix in suffixes_espaces:
+            description = description.replace(suffix, "")
+        # Supprimer les suffixes avec tiret
+        suffixes_tiret = ["like", "related"]
+        words = description.split()
+        cleaned_words = []
+        for word in words:
+            if "-" in word:
+                parts = word.split("-")
+                if parts[-1].lower() in suffixes_tiret:
+                    word = "-".join(parts[:-1])
+            cleaned_words.append(word)
+        return " ".join(cleaned_words).strip()
+
+    def _rematch(description, results):
+        best_symbol = ""
+        best_score = 0
+        best_name = ""
+        for symbol, all_names in results:
+            for name in all_names:
+                score = similarity(description, name)
+                if score > best_score:
+                    best_score = score
+                    best_symbol = symbol
+                    best_name = name
+        return best_symbol if best_score >= THRESHOLD else "", best_score, best_name
+
+    def _fetch(description, exact=True):
         try:
-            response = requests.get(UNIPROT_URL, params={
-                "query":  f'protein_name:"{description}" AND reviewed:true AND organism_id:9606',
+            q = f'protein_name:"{description}"' if exact else f'protein_name:{description}'
+            query = f'{q} AND reviewed:true AND organism_id:9606'
+            response = requests.get(base, params={
+                "query":  query,
                 "fields": "gene_names,protein_name",
                 "format": "json",
-                "size":   5
+                "size":   SIZE
             }, timeout=10)
             results = response.json().get("results", [])
-            
+
             best_symbol = ""
             best_score = 0
+            best_name = ""
+            results_cache = []
 
             for r in results:
                 if r.get("entryType") != "UniProtKB reviewed (Swiss-Prot)":
@@ -48,20 +85,37 @@ def fill_symbols(df, base, taxon_ref):
                 for alt in desc.get("alternativeNames", []):
                     all_names.append(alt.get("fullName", {}).get("value", ""))
 
-                # Prendre le meilleur score de similarité parmi tous les noms
-                score = max((similarity(description, name) for name in all_names), default=0)
-                if score > best_score:
-                    best_score = score
-                    best_symbol = symbol
+                results_cache.append((symbol, all_names))
 
-            time.sleep(default_wait)
-            # Seuil minimum de similarité
-            return best_symbol if best_score >= 0.4 else "", best_score
+                for name in all_names:
+                    score = similarity(description, name)
+                    if score > best_score:
+                        best_score = score
+                        best_symbol = symbol
+                        best_name = name
+
+            return best_symbol if best_score >= THRESHOLD else "", best_score, best_name, results_cache
 
         except Exception as e:
             tqdm.write(f"  Erreur: {e}")
-            time.sleep(default_wait)
-            return "", 0
+            return "", 0, "", []
+
+    def fetch_single(description):
+        symbol, score, matched_name, results_cache = _fetch(description, exact=True)
+
+        if not symbol:
+            clean = clean_description(description)
+            if clean != description:
+                symbol, score, matched_name, results_cache = _fetch(clean, exact=True)
+
+        if not symbol:
+            symbol, score, matched_name, results_cache = _fetch(clean, exact=False)
+
+        if not symbol and results_cache:
+            symbol, score, matched_name = _rematch(clean, results_cache)
+
+        time.sleep(default_wait)
+        return symbol
 
     mask = df["gene_symbol"].str.startswith("LOC") & ~df["description"].str.startswith("uncharacterized")
     desc_unique = df.loc[mask, "description"].dropna().astype(str).unique()
@@ -71,7 +125,7 @@ def fill_symbols(df, base, taxon_ref):
 
     def process_desc(args):
         i, desc = args
-        symbol, score = fetch_single(desc)
+        symbol = fetch_single(desc)
         with cache_lock:
             cache[desc] = symbol
         return i, bool(symbol)
