@@ -3,6 +3,7 @@ from difflib import SequenceMatcher
 from tqdm import tqdm
 import threading
 import requests
+import time
 import os
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -13,6 +14,13 @@ SIZE = 5
 
 
 def fill_symbols(df, base, taxon_ref):
+
+    df["gene_symbol"] = df.apply(
+        lambda r:
+        "" if r["gene_id"][:3] == "LOC" and r["gene_biotype"] == "protein_coding"
+        else r["gene_id"],
+        axis=1
+    )
 
     def similarity(a, b):
         a = a.lower().replace("-", " ")
@@ -47,7 +55,7 @@ def fill_symbols(df, base, taxon_ref):
     def _fetch(description, exact=True):
         try:
             q = f'protein_name:"{description}"' if exact else f'protein_name:{description}'
-            query = f'{q} AND reviewed:true AND organism_id:9606'
+            query = f'{q} AND reviewed:true AND organism_id:{taxon_ref}'
             response = requests.get(base, params={
                 "query":  query,
                 "fields": "gene_names,protein_name",
@@ -104,29 +112,32 @@ def fill_symbols(df, base, taxon_ref):
 
         if not symbol and results_cache:
             symbol = _rematch(clean, results_cache)
-
+        
+        time.sleep(default_wait)
         return symbol
 
-    mask = df["gene_symbol"].str.startswith("LOC") & ~df["description"].str.startswith("uncharacterized")
+    mask = (df["gene_symbol"] == "") & ~df["description"].str.startswith("uncharacterized")
     desc_unique = df.loc[mask, "description"].dropna().astype(str).unique()
+    print(f"mask sum: {mask.sum()}")
+    print(f"desc_unique len: {len(desc_unique)}")
+    print(df["gene_symbol"].value_counts().head())
+    print(df["description"].isna().sum(), "NaN descriptions")
 
     cache = {}
     cache_lock = threading.Lock()
 
-    def process_desc(args):
-        i, desc = args
+    def process_desc(desc):
         symbol = fetch_single(desc)
         with cache_lock:
             cache[desc] = symbol
-        return i, bool(symbol)
+        return bool(symbol)
 
     with tqdm(total=len(desc_unique), desc="Searching UniProt symbols", unit="description",
               bar_format="{desc}: {n}/{total} |{bar}|",
               ascii="░▒▓█", leave=False) as pbar:
         with ThreadPoolExecutor(max_workers=num_threads) as executor:
-            futures = {executor.submit(process_desc, args): args for args in enumerate(desc_unique)}
+            futures = {executor.submit(process_desc, desc): desc for desc in desc_unique}
             for future in as_completed(futures):
-                i, matched = future.result()
                 pbar.update(1)
         pbar.n = pbar.total
         pbar.refresh()
@@ -136,4 +147,7 @@ def fill_symbols(df, base, taxon_ref):
         lambda r: r["gene_symbol"] if r["gene_symbol"] else r["gene_id"],
         axis=1
     )
+
+    print(f"LOC genes symbols obtained")
+
     return df

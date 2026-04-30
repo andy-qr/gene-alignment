@@ -10,6 +10,14 @@ from api import get_thread_key, num_threads
 
 
 def fill_all_ids(df, base, taxon):
+
+    df["ncbi_id"] = df.apply(
+        lambda r:
+        r["gene_id"].replace("LOC", "") if r["gene_id"][:3] == "LOC"
+        else "",
+        axis = 1
+    ).astype(str)
+
     df["ncbi_id"] = df["ncbi_id"].fillna("").astype(str)
     mask_missing = (df["ncbi_id"] == "")
     non_loc_symbols = df.loc[mask_missing, "gene_id"].tolist()
@@ -63,4 +71,7 @@ def fill_all_ids(df, base, taxon):
     
     df.loc[mask_missing, "ncbi_id"] = df.loc[mask_missing, "gene_id"].map(symbol_to_id)
     df["ncbi_id"] = df["ncbi_id"].fillna("").astype(str)
+    
+    print(f"All NCBI gene ids obtained")
+    
     return df

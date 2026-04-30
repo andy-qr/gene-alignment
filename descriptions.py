@@ -36,7 +36,10 @@ def fill_descriptions(df, base):
         time.sleep(wait)
         return batch_results
 
-    loc_symbols = df[df["gene_symbol"] == ""]["gene_id"].tolist()
+    loc_symbols = df[
+        df["gene_id"].str.startswith("LOC") & 
+        (df["gene_biotype"] == "protein_coding")
+    ]["gene_id"].tolist()
     batch_size = 100
     total = len(loc_symbols)
     batches = [loc_symbols[i:i + batch_size] for i in range(0, total, batch_size)]
@@ -59,17 +62,15 @@ def fill_descriptions(df, base):
 
 
     df_ncbi = pd.DataFrame(results)
-    df = df.merge(df_ncbi[["gene_id", "symbol_ncbi", "description"]], on="gene_id", how="left")
+    id_to_desc = dict(zip(df_ncbi["gene_id"], df_ncbi["description"]))
 
-    df["gene_symbol"] = df.apply(
-        lambda r: r["symbol_ncbi"] if r["gene_symbol"] == "" and pd.notna(r["symbol_ncbi"]) else r["gene_symbol"],
-        axis=1
-    )
-    df.drop(columns="symbol_ncbi", inplace=True)
+    df["description"] = df["gene_id"].map(id_to_desc).fillna("")
 
     cols = df.columns.tolist()
     cols.remove("description")
     cols.insert(4, "description")
     df = df[cols]
+
+    print(f"LOC genes descriptions obtained")
 
     return df
