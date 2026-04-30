@@ -3,7 +3,6 @@ from difflib import SequenceMatcher
 from tqdm import tqdm
 import threading
 import requests
-import time
 import os
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -14,8 +13,6 @@ SIZE = 5
 
 
 def fill_symbols(df, base, taxon_ref):
-    total_matched = 0
-    matched_lock = threading.Lock()
 
     def similarity(a, b):
         a = a.lower().replace("-", " ")
@@ -39,14 +36,12 @@ def fill_symbols(df, base, taxon_ref):
     def _rematch(description, results):
         best_symbol = ""
         best_score = 0
-        best_name = ""
         for symbol, all_names in results:
             for name in all_names:
                 score = similarity(description, name)
                 if score > best_score:
                     best_score = score
                     best_symbol = symbol
-                    best_name = name
         return best_symbol if best_score >= THRESHOLD else ""
     
     def _fetch(description, exact=True):
@@ -132,13 +127,9 @@ def fill_symbols(df, base, taxon_ref):
             futures = {executor.submit(process_desc, args): args for args in enumerate(desc_unique)}
             for future in as_completed(futures):
                 i, matched = future.result()
-                with matched_lock:
-                    total_matched += matched
                 pbar.update(1)
         pbar.n = pbar.total
         pbar.refresh()
-
-    print(f"✓ {total_matched}/{len(desc_unique)} symbols résolus via UniProt Swiss-Prot")
 
     df.loc[mask, "gene_symbol"] = df.loc[mask, "description"].map(cache).fillna("")
     df["gene_symbol"] = df.apply(

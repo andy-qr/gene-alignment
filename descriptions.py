@@ -1,4 +1,4 @@
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 import pandas as pd
 import threading
@@ -45,15 +45,18 @@ def fill_descriptions(df, base):
     results_lock = threading.Lock()
 
     with tqdm(total=total, desc="Searching for NCBI descriptions", unit="gene",
-              bar_format="{desc}: {n}/{total} |{bar}|",
-              ascii="░▒▓█", leave=False) as pbar:
+          bar_format="{desc}: {n}/{total} |{bar}|",
+          ascii="░▒▓█", leave=False) as pbar:
         with ThreadPoolExecutor(max_workers=num_threads) as executor:
-            for batch_result in executor.map(fetch_batch, batches):
+            futures = {executor.submit(fetch_batch, batch): len(batch) for batch in batches}
+            for future in as_completed(futures):
+                batch_len = futures[future]
                 with results_lock:
-                    results.extend(batch_result)
-                pbar.update(batch_size)
+                    results.extend(future.result())
+                pbar.update(batch_len)
+        pbar.n = pbar.total
+        pbar.refresh()
 
-    tqdm.write("\r" + " " * 80 + "\r", end="")
 
     df_ncbi = pd.DataFrame(results)
     df = df.merge(df_ncbi[["gene_id", "symbol_ncbi", "description"]], on="gene_id", how="left")

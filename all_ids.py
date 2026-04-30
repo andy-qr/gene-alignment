@@ -1,4 +1,4 @@
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 import threading
 import requests
@@ -49,14 +49,18 @@ def fill_all_ids(df, base, taxon):
     result_lock = threading.Lock()
 
     with tqdm(total=len(non_loc_symbols), desc="Searching for NCBI ids", unit="gene",
-              bar_format="{desc}: {n}/{total} |{bar}|",
-              ascii="░▒▓█", leave=False) as pbar:
+          bar_format="{desc}: {n}/{total} |{bar}|",
+          ascii="░▒▓█", leave=False) as pbar:
         with ThreadPoolExecutor(max_workers=num_threads) as executor:
-            for batch_result in executor.map(fetch_ids_batch, batches):
+            futures = {executor.submit(fetch_ids_batch, batch): len(batch) for batch in batches}
+            for future in as_completed(futures):
+                batch_len = futures[future]
                 with result_lock:
-                    symbol_to_id.update(batch_result)
-                pbar.update(100)
-
+                    symbol_to_id.update(future.result())
+                pbar.update(batch_len)
+        pbar.n = pbar.total
+        pbar.refresh()
+    
     df.loc[mask_missing, "ncbi_id"] = df.loc[mask_missing, "gene_id"].map(symbol_to_id)
     df["ncbi_id"] = df["ncbi_id"].fillna("").astype(str)
     return df
