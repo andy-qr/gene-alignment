@@ -1,20 +1,12 @@
+from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
+import threading
 import requests
 import time
 import os
-from concurrent.futures import ThreadPoolExecutor
-import threading
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
-from api import api_keys, wait
-
-thread_local = threading.local()
-
-def get_thread_key():
-    if not hasattr(thread_local, "api_key"):
-        idx = int(threading.current_thread().name.split("_")[-1]) % len(api_keys)
-        thread_local.api_key = api_keys[idx]
-    return thread_local.api_key
+from api import get_thread_key, num_threads
 
 
 def fill_all_ids(df, base, taxon):
@@ -26,7 +18,7 @@ def fill_all_ids(df, base, taxon):
     batches = [non_loc_symbols[i:i + 100] for i in range(0, len(non_loc_symbols), 100)]
 
     def fetch_ids_batch(symbols):
-        api_key = get_thread_key()
+        api_key, wait = get_thread_key()
         query = " OR ".join([f"{s}[Gene Name]" for s in symbols])
         query += f' AND "{taxon}"[Organism]'
         search_r = requests.get(f"{base}/esearch.fcgi", params={
@@ -59,7 +51,7 @@ def fill_all_ids(df, base, taxon):
     with tqdm(total=len(non_loc_symbols), desc="Searching for NCBI ids", unit="gene",
               bar_format="{desc}: {n}/{total} |{bar}|",
               ascii="░▒▓█", leave=False) as pbar:
-        with ThreadPoolExecutor(max_workers=len(api_keys)) as executor:
+        with ThreadPoolExecutor(max_workers=num_threads) as executor:
             for batch_result in executor.map(fetch_ids_batch, batches):
                 with result_lock:
                     symbol_to_id.update(batch_result)

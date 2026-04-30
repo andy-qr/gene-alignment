@@ -1,4 +1,3 @@
-API_KEY = "6aa784ef049697c8d1801ce03dd5b1344908"
 BASE = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 TAXON = "Columba livia"
 TAXON_REF = "Homo sapiens"

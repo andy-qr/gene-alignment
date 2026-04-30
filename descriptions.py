@@ -7,21 +7,13 @@ import time
 import os
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
-from api import api_keys, wait
-
-thread_local = threading.local()
-
-def get_thread_key():
-    if not hasattr(thread_local, "api_key"):
-        idx = int(threading.current_thread().name.split("_")[-1]) % len(api_keys)
-        thread_local.api_key = api_keys[idx]
-    return thread_local.api_key
+from api import get_thread_key, num_threads
 
 
 def fill_descriptions(df, base):
 
     def fetch_batch(symbols):
-        api_key = get_thread_key()
+        api_key, wait = get_thread_key()
         ids_numeriques = [s.replace("LOC", "") for s in symbols]
         summary_r = requests.get(f"{base}/esummary.fcgi", params={
             "db":      "gene",
@@ -55,14 +47,13 @@ def fill_descriptions(df, base):
     with tqdm(total=total, desc="Searching for NCBI descriptions", unit="gene",
               bar_format="{desc}: {n}/{total} |{bar}|",
               ascii="░▒▓█", leave=False) as pbar:
-        with ThreadPoolExecutor(max_workers=len(api_keys)) as executor:
+        with ThreadPoolExecutor(max_workers=num_threads) as executor:
             for batch_result in executor.map(fetch_batch, batches):
                 with results_lock:
                     results.extend(batch_result)
                 pbar.update(batch_size)
 
     tqdm.write("\r" + " " * 80 + "\r", end="")
-    print("✓ Descriptions des LOCs récupérées")
 
     df_ncbi = pd.DataFrame(results)
     df = df.merge(df_ncbi[["gene_id", "symbol_ncbi", "description"]], on="gene_id", how="left")

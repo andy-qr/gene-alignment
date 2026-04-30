@@ -1,24 +1,13 @@
+from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
+import threading
 import requests
 import time
 import os
 import re
-from concurrent.futures import ThreadPoolExecutor
-import threading
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
-from api import api_keys
-from api import wait
-
-thread_local = threading.local()
-
-def get_thread_key():
-    if not hasattr(thread_local, "api_key"):
-        with threading.Lock():
-            thread_id = threading.current_thread().name
-            idx = int(thread_id.split("_")[-1]) % len(api_keys)
-            thread_local.api_key = api_keys[idx]
-    return thread_local.api_key
+from api import get_thread_key, num_threads
 
 
 def fill_symbols(df, base, taxon_ref):
@@ -43,8 +32,8 @@ def fill_symbols(df, base, taxon_ref):
 
     def get_symbol_from_description(description, taxon=taxon_ref):
         if not description or "uncharacterized" in description.lower():
-            return ""
-        api_key = get_thread_key()
+            return "", 0
+        api_key, wait = get_thread_key()
         clean = clean_description(description)
 
         symbol_match = re.search(r'\b([A-Z][A-Z0-9]{1,9})\b', description)
@@ -69,7 +58,7 @@ def fill_symbols(df, base, taxon_ref):
                     info = summary_r.json().get("result", {}).get(ids[0], {})
                     symbol = info.get("name", "")
                     if symbol and not symbol.startswith("LOC"):
-                        return symbol
+                        return symbol, wait
             except Exception:
                 pass
 
@@ -92,7 +81,7 @@ def fill_symbols(df, base, taxon_ref):
                 info = summary_r.json().get("result", {}).get(ids[0], {})
                 symbol = info.get("name", "")
                 if symbol and not symbol.startswith("LOC"):
-                    return symbol
+                    return symbol, wait
         except Exception:
             pass
 
@@ -106,7 +95,7 @@ def fill_symbols(df, base, taxon_ref):
             }, timeout=10)
             ids = search_r.json().get("esearchresult", {}).get("idlist", [])
             if not ids:
-                return ""
+                return "", 0
             summary_r = requests.get(f"{base}/esummary.fcgi", params={
                 "db":      "gene",
                 "id":      ids[0],
@@ -115,10 +104,10 @@ def fill_symbols(df, base, taxon_ref):
             }, timeout=10)
             info = summary_r.json().get("result", {}).get(ids[0], {})
             symbol = info.get("name", "")
-            return "" if symbol.startswith("LOC") else symbol
+            return ("", 0) if symbol.startswith("LOC") else (symbol, wait)
         except Exception as e:
             tqdm.write(f"  Erreur: {e}")
-            return ""
+            return "", 0
 
     mask = df["gene_symbol"].str.startswith("LOC") & ~df["description"].str.startswith("uncharacterized")
     desc_unique = df.loc[mask, "description"].dropna().unique()
@@ -128,7 +117,7 @@ def fill_symbols(df, base, taxon_ref):
 
     def process_desc(args):
         i, desc = args
-        symbol = get_symbol_from_description(desc)
+        symbol, wait = get_symbol_from_description(desc)
         time.sleep(wait)
         with cache_lock:
             cache[desc] = symbol
@@ -137,7 +126,7 @@ def fill_symbols(df, base, taxon_ref):
     with tqdm(total=len(desc_unique), desc="Searching for NCBI symbols", unit="description",
             bar_format="{desc}: {n}/{total} |{bar}|",
             ascii="░▒▓█", leave=False) as pbar:
-        with ThreadPoolExecutor(max_workers=len(api_keys)) as executor:
+        with ThreadPoolExecutor(max_workers=num_threads) as executor:
             for i in executor.map(process_desc, enumerate(desc_unique)):
                 pbar.update(1)
                 if (i + 1) % 100 == 0:
