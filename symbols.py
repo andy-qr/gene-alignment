@@ -23,18 +23,15 @@ def fill_symbols(df, base, taxon_ref):
         return SequenceMatcher(None, a, b).ratio()
 
     def clean_description(description):
-        # Supprimer les suffixes avec espaces
-        suffixes_espaces = [" associated", " like", " related"]
-        for suffix in suffixes_espaces:
+        suffixes = ["associated","like", "related","probable"]
+        for suffix in suffixes:
             description = description.replace(suffix, "")
-        # Supprimer les suffixes avec tiret
-        suffixes_tiret = ["like", "related"]
         words = description.split()
         cleaned_words = []
         for word in words:
             if "-" in word:
                 parts = word.split("-")
-                if parts[-1].lower() in suffixes_tiret:
+                if parts[-1].lower() in suffixes:
                     word = "-".join(parts[:-1])
             cleaned_words.append(word)
         return " ".join(cleaned_words).strip()
@@ -50,8 +47,8 @@ def fill_symbols(df, base, taxon_ref):
                     best_score = score
                     best_symbol = symbol
                     best_name = name
-        return best_symbol if best_score >= THRESHOLD else "", best_score, best_name
-
+        return best_symbol if best_score >= THRESHOLD else ""
+    
     def _fetch(description, exact=True):
         try:
             q = f'protein_name:"{description}"' if exact else f'protein_name:{description}'
@@ -66,8 +63,7 @@ def fill_symbols(df, base, taxon_ref):
 
             best_symbol = ""
             best_score = 0
-            best_name = ""
-            results_cache = []
+            results_cache = []  # [(symbol, [noms])]
 
             for r in results:
                 if r.get("entryType") != "UniProtKB reviewed (Swiss-Prot)":
@@ -92,29 +88,28 @@ def fill_symbols(df, base, taxon_ref):
                     if score > best_score:
                         best_score = score
                         best_symbol = symbol
-                        best_name = name
 
-            return best_symbol if best_score >= THRESHOLD else "", best_score, best_name, results_cache
+            return best_symbol if best_score >= THRESHOLD else "", results_cache
 
         except Exception as e:
-            tqdm.write(f"  Erreur: {e}")
-            return "", 0, "", []
+            print(f"  Erreur: {e}")
+            return "", []
+
 
     def fetch_single(description):
-        symbol, score, matched_name, results_cache = _fetch(description, exact=True)
+        symbol, results_cache = _fetch(description, exact=True)
+        clean = clean_description(description)
 
         if not symbol:
-            clean = clean_description(description)
             if clean != description:
-                symbol, score, matched_name, results_cache = _fetch(clean, exact=True)
+                symbol, results_cache = _fetch(clean, exact=True)
 
         if not symbol:
-            symbol, score, matched_name, results_cache = _fetch(clean, exact=False)
+            symbol, results_cache = _fetch(clean, exact=False)
 
         if not symbol and results_cache:
-            symbol, score, matched_name = _rematch(clean, results_cache)
+            symbol = _rematch(clean, results_cache)
 
-        time.sleep(default_wait)
         return symbol
 
     mask = df["gene_symbol"].str.startswith("LOC") & ~df["description"].str.startswith("uncharacterized")

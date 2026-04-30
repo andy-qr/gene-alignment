@@ -11,9 +11,9 @@ TAXON_REF = "Homo sapiens"
 NCBI = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 UNIPROT = "https://rest.uniprot.org/uniprotkb/search"
 
-get_descriptions = False
+get_descriptions = True
 get_symbols = True
-get_all_ids = False
+get_all_ids = True
 
 
 import pandas as pd
@@ -54,7 +54,8 @@ if get_descriptions:
     from descriptions import fill_descriptions
     df = fill_descriptions(df, NCBI)
     print(f"LOC genes descriptions obtained")
-    df.to_csv("S:/INSERM/Pipeline/"+FILE+"_descriptions.txt", sep="\t", index=False)
+    if dev:
+        df.to_csv("S:/INSERM/Pipeline/"+FILE+"_descriptions.txt", sep="\t", index=False)
 else:
     df = pd.read_csv(FILE+"_descriptions.txt", sep="\t", dtype={"ncbi_id": str})
 
@@ -62,7 +63,8 @@ if get_symbols:
     from symbols import fill_symbols
     df = fill_symbols(df, UNIPROT, TAXON_REF)
     print(f"LOC genes symbols obtained")
-    df.to_csv("S:/INSERM/Pipeline/"+FILE+"_symbols.txt", sep="\t", index=False)
+    if dev:
+        df.to_csv("S:/INSERM/Pipeline/"+FILE+"_symbols.txt", sep="\t", index=False)
 else :
     df = pd.read_csv(FILE+"_symbols.txt", sep="\t", dtype={"ncbi_id": str})
 
