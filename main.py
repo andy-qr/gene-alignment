@@ -8,7 +8,7 @@ else:
     FILE = input("Source file name (ex: blasto_vs_fibro) : ").strip()
 
 TAXON_REF = "Homo sapiens"
-BASE = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
+NCBI = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 
 get_descriptions = True
 get_symbols = True
@@ -51,7 +51,7 @@ print(f"Using {num_threads} threads")
 
 if get_descriptions:
     from descriptions import fill_descriptions
-    df = fill_descriptions(df, BASE)
+    df = fill_descriptions(df, NCBI)
     print(f"LOC genes descriptions obtained")
     df.to_csv("S:/INSERM/Pipeline/"+FILE+"_descriptions.txt", sep="\t", index=False)
 else:
@@ -59,7 +59,7 @@ else:
 
 if get_symbols:
     from symbols import fill_symbols
-    df = fill_symbols(df, BASE, TAXON_REF)
+    df = fill_symbols(df, NCBI, TAXON_REF)
     print(f"LOC genes symbols obtained")
     df.to_csv("S:/INSERM/Pipeline/"+FILE+"_symbols.txt", sep="\t", index=False)
 else :
@@ -67,6 +67,6 @@ else :
 
 if get_all_ids:
     from all_ids import fill_all_ids
-    df = fill_all_ids(df, BASE, TAXON)
+    df = fill_all_ids(df, NCBI, TAXON)
     print(f"All NCBI gene ids obtained")
     df.to_csv("S:/INSERM/Pipeline/"+FILE+"_final.txt", sep="\t", index=False)
