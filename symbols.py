@@ -118,10 +118,6 @@ def fill_symbols(df, base, taxon_ref):
 
     mask = (df["gene_symbol"] == "") & ~df["description"].str.startswith("uncharacterized")
     desc_unique = df.loc[mask, "description"].dropna().astype(str).unique()
-    print(f"mask sum: {mask.sum()}")
-    print(f"desc_unique len: {len(desc_unique)}")
-    print(df["gene_symbol"].value_counts().head())
-    print(df["description"].isna().sum(), "NaN descriptions")
 
     cache = {}
     cache_lock = threading.Lock()
