@@ -3,8 +3,9 @@ import threading
 import time
 import os
 
+dir = os.path.dirname(os.path.abspath(__file__))
 
-def load_keys(filepath="api.env"):
+def load_keys(filepath = (dir + "/api.env")):
     keys = []
     with open(filepath) as f:
         for line in f:

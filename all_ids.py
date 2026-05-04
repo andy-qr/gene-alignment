@@ -56,9 +56,11 @@ def fill_all_ids(df, base, taxon):
     symbol_to_id = {}
     result_lock = threading.Lock()
 
+    width = len(str(len(non_loc_symbols)))
+    bar_format = f"{{desc}}: {{n:{width}d}}/{{total}} |{{bar:50}}|"
     with tqdm(total=len(non_loc_symbols), desc="Searching for NCBI ids", unit="gene",
-          bar_format="{desc}: {n}/{total} |{bar}|",
-          ascii="░▒▓█", leave=False) as pbar:
+          bar_format=bar_format,
+          ascii=" █", leave=False) as pbar:
         with ThreadPoolExecutor(max_workers=num_threads) as executor:
             futures = {executor.submit(fetch_ids_batch, batch): len(batch) for batch in batches}
             for future in as_completed(futures):

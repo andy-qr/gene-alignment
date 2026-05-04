@@ -128,9 +128,11 @@ def fill_symbols(df, base, taxon_ref):
             cache[desc] = symbol
         return bool(symbol)
 
-    with tqdm(total=len(desc_unique), desc="Searching UniProt symbols", unit="description",
-              bar_format="{desc}: {n}/{total} |{bar}|",
-              ascii="░▒▓█", leave=False) as pbar:
+    width = len(str(len(desc_unique)))
+    bar_format = f"{{desc}}: {{n:{width}d}}/{{total}} |{{bar:50}}|"
+    with tqdm(total=len(desc_unique), desc="Searching for UniProt symbols", unit="description",
+              bar_format=bar_format,
+              ascii=" █", leave=False) as pbar:
         with ThreadPoolExecutor(max_workers=num_threads) as executor:
             futures = {executor.submit(process_desc, desc): desc for desc in desc_unique}
             for future in as_completed(futures):
@@ -144,6 +146,6 @@ def fill_symbols(df, base, taxon_ref):
         axis=1
     )
 
-    print(f"LOC genes symbols obtained")
+    print(f"LOC gene symbols obtained")
 
     return df
