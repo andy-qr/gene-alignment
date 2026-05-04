@@ -6,7 +6,17 @@ import json
 import sys
 import os
 
+
+def get_base_path():
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    else:
+        return os.path.dirname(os.path.abspath(__file__))
+
+os.chdir(get_base_path())
+
 HISTORY_FILE = "last_taxon.json"
+
 
 class TextRedirector:
     def __init__(self, text_widget, bar_widget):
@@ -79,7 +89,10 @@ def launch_gui():
 
     file_var = tk.StringVar()
     def browse():
-        path = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
+        path = filedialog.askopenfilename(filetypes=[
+        ("Supported files", "*.txt *.xlsx *.xls"),
+        ("All files", "*.*")
+        ])
         file_var.set(path)
 
     tk.Label(root, text="Source file:").pack(pady=5)

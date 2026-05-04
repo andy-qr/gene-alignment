@@ -1,11 +1,19 @@
 from itertools import cycle
 import threading
 import time
+import sys
 import os
 
-dir = os.path.dirname(os.path.abspath(__file__))
 
-def load_keys(filepath = (dir + "/api.env")):
+def get_base_path():
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    else:
+        return os.path.dirname(os.path.abspath(__file__))
+
+os.chdir(get_base_path())
+
+def load_keys(filepath = ("api.env")):
     keys = []
     with open(filepath) as f:
         for line in f:

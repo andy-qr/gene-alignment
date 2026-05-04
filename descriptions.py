@@ -25,11 +25,11 @@ def fill_descriptions(df, base):
             tqdm.write(f"  Erreur: {summary_r.status_code} — {summary_r.text[:200]}")
             return []
         batch_results = []
-        for gene_id, info in summary_r.json().get("result", {}).items():
-            if gene_id == "uids":
+        for gene_name, info in summary_r.json().get("result", {}).items():
+            if gene_name == "uids":
                 continue
             batch_results.append({
-                "gene_id":     "LOC" + gene_id,
+                "gene_id":     "LOC" + gene_name,
                 "symbol_ncbi": info.get("name"),
                 "description": info.get("description")
             })
@@ -37,9 +37,9 @@ def fill_descriptions(df, base):
         return batch_results
 
     loc_symbols = df[
-        df["gene_id"].str.startswith("LOC") & 
+        df["gene_name"].str.startswith("LOC") & 
         (df["gene_biotype"] == "protein_coding")
-    ]["gene_id"].tolist()
+    ]["gene_name"].tolist()
     batch_size = 100
     total = len(loc_symbols)
     batches = [loc_symbols[i:i + batch_size] for i in range(0, total, batch_size)]
@@ -64,9 +64,9 @@ def fill_descriptions(df, base):
 
 
     df_ncbi = pd.DataFrame(results)
-    id_to_desc = dict(zip(df_ncbi["gene_id"], df_ncbi["description"]))
+    id_to_desc = dict(zip(df_ncbi["gene_name"], df_ncbi["description"]))
 
-    df["description"] = df["gene_id"].map(id_to_desc).fillna("")
+    df["description"] = df["gene_name"].map(id_to_desc).fillna("")
 
     cols = df.columns.tolist()
     cols.remove("description")

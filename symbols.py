@@ -17,8 +17,8 @@ def fill_symbols(df, base, taxon_ref):
 
     df["gene_symbol"] = df.apply(
         lambda r:
-        "" if r["gene_id"][:3] == "LOC" and r["gene_biotype"] == "protein_coding"
-        else r["gene_id"],
+        "" if r["gene_name"][:3] == "LOC" and r["gene_biotype"] == "protein_coding"
+        else r["gene_name"],
         axis=1
     )
 
@@ -142,7 +142,7 @@ def fill_symbols(df, base, taxon_ref):
 
     df.loc[mask, "gene_symbol"] = df.loc[mask, "description"].map(cache).fillna("")
     df["gene_symbol"] = df.apply(
-        lambda r: r["gene_symbol"] if r["gene_symbol"] else r["gene_id"],
+        lambda r: r["gene_symbol"] if r["gene_symbol"] else r["gene_name"],
         axis=1
     )
 

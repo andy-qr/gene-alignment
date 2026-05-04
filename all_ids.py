@@ -9,7 +9,42 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 from api import get_thread_key, num_threads
 
 
+
 def fill_all_ids(df, base, taxon):
+
+    if "gene_biotype" not in df.columns:
+        df["gene_biotype"] = ""
+        
+        # Récupérer le biotype des LOC via NCBI
+        loc_ids = df[df["gene_id"].str.startswith("LOC")]["gene_id"].tolist()
+        loc_batches = [loc_ids[i:i+100] for i in range(0, len(loc_ids), 100)]
+        
+        def fetch_biotype_batch(symbols):
+            api_key, wait = get_thread_key()
+            ids_numeriques = [s.replace("LOC", "") for s in symbols]
+            summary_r = requests.get(f"{base}/esummary.fcgi", params={
+                "db":      "gene",
+                "id":      ",".join(ids_numeriques),
+                "retmode": "json",
+                "api_key": api_key
+            }, timeout=10)
+            result = {}
+            for gene_id, info in summary_r.json().get("result", {}).items():
+                if gene_id == "uids":
+                    continue
+                biotype = info.get("type", "")
+                result["LOC" + gene_id] = biotype
+            time.sleep(wait)
+            return result
+        
+        id_to_biotype = {}
+        for batch in loc_batches:
+            id_to_biotype.update(fetch_biotype_batch(batch))
+        
+        df.loc[df["gene_id"].str.startswith("LOC"), "gene_biotype"] = df.loc[df["gene_id"].str.startswith("LOC"), "gene_id"].map(id_to_biotype)
+        
+        df.loc[~df["gene_id"].str.startswith("LOC"), "gene_biotype"] = "protein_coding"
+
 
     df["ncbi_id"] = df.apply(
         lambda r:
