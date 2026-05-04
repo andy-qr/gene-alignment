@@ -6,7 +6,7 @@ TAXON_REF = "Homo sapiens"
 NCBI = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 UNIPROT = "https://rest.uniprot.org/uniprotkb/search"
 
-def run(TAXON, FILE):
+def run(TAXON, FILE, output_format="txt"):
     from api import num_threads
 
     if FILE.endswith(".xlsx") or FILE.endswith(".xls"):
@@ -36,14 +36,18 @@ def run(TAXON, FILE):
     df = fill_descriptions(df, NCBI)
 
     from symbols import fill_symbols
-    df = fill_symbols(df, UNIPROT, taxon_id(TAXON_REF)[0])
+    df = fill_symbols(df, UNIPROT, taxon_id(TAXON_REF)[1])
 
+
+    df["gene_id"] = df["ncbi_id"]
+    df.drop(columns="ncbi_id", inplace=True)
     cols = df.columns.tolist()
     fixed_cols = ["gene_id", "gene_name", "gene_biotype", "gene_symbol", "description"]
     other_cols = [c for c in df.columns if c not in fixed_cols]
     df = df[fixed_cols + other_cols]
 
-    if excel:
-        df.to_excel(FILE+"_final.xlsx", index=False)
+    base_name = FILE.rsplit(".", 1)[0]
+    if output_format=="xlsx":
+        df.to_excel(base_name+"_completed.xlsx", index=False)
     else:
-        df.to_csv(FILE+"_final.txt", sep="\t", index=False)
+        df.to_csv(base_name+"_completed.txt", sep="\t", index=False)

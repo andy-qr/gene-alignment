@@ -68,10 +68,6 @@ def fill_descriptions(df, base):
 
     df["description"] = df["gene_name"].map(id_to_desc).fillna("")
 
-    cols = df.columns.tolist()
-    cols.remove("description")
-    cols.insert(4, "description")
-    df = df[cols]
 
     print(f"LOC genes descriptions obtained")
 

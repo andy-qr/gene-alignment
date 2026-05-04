@@ -13,9 +13,9 @@ def get_base_path():
     else:
         return os.path.dirname(os.path.abspath(__file__))
 
-os.chdir(get_base_path())
-
-HISTORY_FILE = "last_taxon.json"
+base_path = get_base_path()
+os.chdir(base_path)
+HISTORY_FILE = os.path.join(base_path, "last_taxon.json")
 
 
 class TextRedirector:
@@ -37,26 +37,31 @@ class TextRedirector:
     def flush(self):
         pass
 
+
 def load_last_taxon():
     if os.path.exists(HISTORY_FILE):
         with open(HISTORY_FILE) as f:
             return json.load(f).get("taxon", "")
     return ""
 
+
 def save_last_taxon(taxon):
     with open(HISTORY_FILE, "w") as f:
         json.dump({"taxon": taxon}, f)
+
 
 last = load_last_taxon()
 TAXONS = ["Anas platyrhynchos", "Columba livia", "Gallus gallus", "Taeniopygia guttata"]
 if last and last not in TAXONS:
     TAXONS.append(last)
 
+
 def launch_gui():
     root = tk.Tk()
     root.title("Gene Alignment Pipeline")
-    root.geometry("420x320")
+    root.geometry("440x420")
 
+    # Taxon
     tk.Label(root, text="Studied taxon:").pack(pady=5)
     taxon_var = tk.StringVar(value=TAXONS[0])
     custom_var = tk.StringVar()
@@ -65,6 +70,7 @@ def launch_gui():
 
     def on_select():
         custom_entry.config(state="normal" if taxon_var.get() == "Autre" else "disabled")
+        validate_btn.config(state="normal" if taxon_var.get() == "Autre" else "disabled")
 
     def validate_custom():
         taxon = custom_var.get().strip()
@@ -72,35 +78,50 @@ def launch_gui():
             return
         result = taxon_id(taxon)
         if result:
-            messagebox.showinfo("✓", f"Found taxon : {taxon}")
+            messagebox.showinfo("✓", f"Found taxon: {taxon}")
         else:
-            suggestions = taxon_suggestions(taxon)  # à implémenter dans taxon.py
+            suggestions = taxon_suggestions(taxon)
             msg = "Non-existing taxon."
             if suggestions:
-                msg += f"\nLe plus proche : {suggestions[0]}"
-            messagebox.showwarning("Non-existing taxon.", msg)
+                msg += f"\nClosest match: {suggestions[0]}"
+            messagebox.showwarning("Non-existing taxon", msg)
 
     for taxon in TAXONS:
         tk.Radiobutton(frame, text=taxon, variable=taxon_var, value=taxon, command=on_select).pack(anchor="w")
-    tk.Radiobutton(frame, text="Autre :", variable=taxon_var, value="Autre", command=on_select).pack(anchor="w")
-    custom_entry = tk.Entry(frame, textvariable=custom_var, width=30, state="disabled")
-    custom_entry.pack(anchor="w", padx=20)
-    tk.Button(frame, text="Search", command=validate_custom).pack(anchor="w", padx=20)
+    tk.Radiobutton(frame, text="Other:", variable=taxon_var, value="Autre", command=on_select).pack(anchor="w")
 
+    custom_frame = tk.Frame(frame)
+    custom_frame.pack(anchor="w", padx=20)
+    custom_entry = tk.Entry(custom_frame, textvariable=custom_var, width=25, state="disabled")
+    custom_entry.pack(side="left")
+    validate_btn = tk.Button(custom_frame, text="Check", command=validate_custom, state="disabled")
+    validate_btn.pack(side="left", padx=5)
+
+    # Fichier source
+    tk.Label(root, text="Source file:").pack(pady=5)
     file_var = tk.StringVar()
+
     def browse():
         path = filedialog.askopenfilename(filetypes=[
-        ("Supported files", "*.txt *.xlsx *.xls"),
-        ("All files", "*.*")
+            ("Supported files", "*.txt *.xlsx *.xls"),
+            ("All files", "*.*")
         ])
         file_var.set(path)
 
-    tk.Label(root, text="Source file:").pack(pady=5)
     file_frame = tk.Frame(root)
     file_frame.pack()
     tk.Entry(file_frame, textvariable=file_var, width=35).pack(side="left")
     tk.Button(file_frame, text="Browse", command=browse).pack(side="left", padx=5)
 
+    # Format de sortie
+    format_var = tk.StringVar(value="txt")
+    format_frame = tk.Frame(root)
+    format_frame.pack(pady=5)
+    tk.Label(format_frame, text="Output format:").pack(side="left")
+    tk.Radiobutton(format_frame, text=".txt", variable=format_var, value="txt").pack(side="left")
+    tk.Radiobutton(format_frame, text=".xlsx", variable=format_var, value="xlsx").pack(side="left")
+
+    # Bouton Run
     def run():
         taxon = custom_var.get().strip() if taxon_var.get() == "Autre" else taxon_var.get()
         filepath = file_var.get().strip()
@@ -124,7 +145,7 @@ def launch_gui():
         root2.update()
 
         try:
-            main.run(taxon, filepath)
+            main.run(taxon, filepath, format_var.get())
         except Exception as e:
             messagebox.showerror("Error", str(e))
         sys.stdout = sys.__stdout__
@@ -132,5 +153,6 @@ def launch_gui():
 
     tk.Button(root, text="Run", command=run).pack(pady=10)
     root.mainloop()
+
 
 launch_gui()
