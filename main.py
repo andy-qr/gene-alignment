@@ -15,15 +15,14 @@ def run(TAXON, FILE):
     else:
         excel = False
         df = pd.read_csv(FILE, sep="\t")
-        df = pd.read_csv(FILE, sep="\t")
 
-    cols = df.columns.tolist()
-    if "gene_name" not in cols:
-        if "gene_id" not in cols:
+
+    if "gene_name" not in df.columns:
+        if "gene_id" not in df.columns:
             raise ValueError(f"gene_name or gene_id column required")
         else:
             df["gene_name"] = df["gene_id"]
-    if "gene_id" not in cols:
+    if "gene_id" not in df.columns:
             df["gene_id"] = df["gene_name"]
 
 
@@ -39,12 +38,12 @@ def run(TAXON, FILE):
     from symbols import fill_symbols
     df = fill_symbols(df, UNIPROT, taxon_id(TAXON_REF)[0])
 
-
+    cols = df.columns.tolist()
     fixed_cols = ["gene_id", "gene_name", "gene_biotype", "gene_symbol", "description"]
     other_cols = [c for c in df.columns if c not in fixed_cols]
     df = df[fixed_cols + other_cols]
 
     if excel:
-        df.to_excel(FILE+"_final.xlsx", sep="\t", index=False)
+        df.to_excel(FILE+"_final.xlsx", index=False)
     else:
         df.to_csv(FILE+"_final.txt", sep="\t", index=False)

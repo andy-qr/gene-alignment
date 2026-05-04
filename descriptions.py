@@ -64,7 +64,7 @@ def fill_descriptions(df, base):
 
 
     df_ncbi = pd.DataFrame(results)
-    id_to_desc = dict(zip(df_ncbi["gene_name"], df_ncbi["description"]))
+    id_to_desc = dict(zip(df_ncbi["gene_id"], df_ncbi["description"]))
 
     df["description"] = df["gene_name"].map(id_to_desc).fillna("")
 
