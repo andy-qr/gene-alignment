@@ -12,6 +12,10 @@ from api import get_thread_key, num_threads
 
 def fill_descriptions(df, base):
 
+    if "description" in df.columns and df["description"].astype(bool).sum() > 0:
+        print("Descriptions already filled — skipping")
+        return df
+
     def fetch_batch(symbols):
         api_key, wait = get_thread_key()
         ids_numeriques = [s.replace("LOC", "") for s in symbols]

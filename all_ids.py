@@ -15,8 +15,7 @@ def fill_all_ids(df, base, taxon):
     if "gene_biotype" not in df.columns:
         df["gene_biotype"] = ""
         
-        # Récupérer le biotype des LOC via NCBI
-        loc_ids = df[df["gene_id"].str.startswith("LOC")]["gene_id"].tolist()
+        loc_ids = df[df["gene_name"].str.startswith("LOC")]["gene_name"].tolist()
         loc_batches = [loc_ids[i:i+100] for i in range(0, len(loc_ids), 100)]
         
         def fetch_biotype_batch(symbols):
@@ -41,21 +40,21 @@ def fill_all_ids(df, base, taxon):
         for batch in loc_batches:
             id_to_biotype.update(fetch_biotype_batch(batch))
         
-        df.loc[df["gene_id"].str.startswith("LOC"), "gene_biotype"] = df.loc[df["gene_id"].str.startswith("LOC"), "gene_id"].map(id_to_biotype)
+        df.loc[df["gene_name"].str.startswith("LOC"), "gene_biotype"] = df.loc[df["gene_id"].str.startswith("LOC"), "gene_id"].map(id_to_biotype)
         
-        df.loc[~df["gene_id"].str.startswith("LOC"), "gene_biotype"] = "protein_coding"
+        df.loc[~df["gene_name"].str.startswith("LOC"), "gene_biotype"] = "protein_coding"
 
 
     df["ncbi_id"] = df.apply(
         lambda r:
-        r["gene_id"].replace("LOC", "") if r["gene_id"][:3] == "LOC"
+        r["gene_name"].replace("LOC", "") if r["gene_id"][:3] == "LOC"
         else "",
         axis = 1
     ).astype(str)
 
     df["ncbi_id"] = df["ncbi_id"].fillna("").astype(str)
     mask_missing = (df["ncbi_id"] == "")
-    non_loc_symbols = df.loc[mask_missing, "gene_id"].tolist()
+    non_loc_symbols = df.loc[mask_missing, "gene_name"].tolist()
 
     # Découper en batches
     batches = [non_loc_symbols[i:i + 100] for i in range(0, len(non_loc_symbols), 100)]
@@ -105,8 +104,8 @@ def fill_all_ids(df, base, taxon):
                 pbar.update(batch_len)
         pbar.n = pbar.total
         pbar.refresh()
-    
-    df.loc[mask_missing, "ncbi_id"] = df.loc[mask_missing, "gene_id"].map(symbol_to_id)
+        
+    df.loc[mask_missing, "ncbi_id"] = df.loc[mask_missing, "gene_id"].map(symbol_to_id).fillna("").astype(str)
     df["ncbi_id"] = df["ncbi_id"].fillna("").astype(str)
     
     print(f"All NCBI gene ids obtained")

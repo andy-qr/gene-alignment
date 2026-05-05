@@ -1,19 +1,22 @@
+from ensembl import is_ensembl, ensembl_to_loc
 from taxon import taxon_id
 import pandas as pd
+import re
 
 
 TAXON_REF = "Homo sapiens"
 NCBI = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 UNIPROT = "https://rest.uniprot.org/uniprotkb/search"
 
+
+
+
 def run(TAXON, FILE, output_format="txt"):
     from api import num_threads
 
     if FILE.endswith(".xlsx") or FILE.endswith(".xls"):
-        excel = True
         df = pd.read_excel(FILE)
     else:
-        excel = False
         df = pd.read_csv(FILE, sep="\t")
 
 
@@ -25,19 +28,22 @@ def run(TAXON, FILE, output_format="txt"):
     if "gene_id" not in df.columns:
             df["gene_id"] = df["gene_name"]
 
-
     print(f"Using {num_threads} threads")
     print(f"Source file obtained")
     
-    from all_ids import fill_all_ids
-    df = fill_all_ids(df, NCBI, TAXON)
+    if is_ensembl(df):
+        df = ensembl_to_loc(df)
+    else:
+        from all_ids import fill_all_ids
+        df = fill_all_ids(df, NCBI, TAXON)
     
+    df.to_excel(FILE+"_completed.xlsx", index=False)
+
     from descriptions import fill_descriptions
     df = fill_descriptions(df, NCBI)
 
     from symbols import fill_symbols
     df = fill_symbols(df, UNIPROT, taxon_id(TAXON_REF)[1])
-
 
     df["gene_id"] = df["ncbi_id"]
     df.drop(columns="ncbi_id", inplace=True)
@@ -51,3 +57,5 @@ def run(TAXON, FILE, output_format="txt"):
         df.to_excel(base_name+"_completed.xlsx", index=False)
     else:
         df.to_csv(base_name+"_completed.txt", sep="\t", index=False)
+    
+    print("File saved")
