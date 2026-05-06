@@ -10,7 +10,6 @@ UNIPROT = "https://rest.uniprot.org/uniprotkb/search"
 
 
 
-
 def run(TAXON, FILE, output_format="txt"):
     from api import num_threads
 
@@ -37,8 +36,6 @@ def run(TAXON, FILE, output_format="txt"):
         from all_ids import fill_all_ids
         df = fill_all_ids(df, NCBI, TAXON)
     
-    df.to_excel(FILE+"_completed.xlsx", index=False)
-
     from descriptions import fill_descriptions
     df = fill_descriptions(df, NCBI)
 
@@ -47,7 +44,6 @@ def run(TAXON, FILE, output_format="txt"):
 
     df["gene_id"] = df["ncbi_id"]
     df.drop(columns="ncbi_id", inplace=True)
-    cols = df.columns.tolist()
     fixed_cols = ["gene_id", "gene_name", "gene_biotype", "gene_symbol", "description"]
     other_cols = [c for c in df.columns if c not in fixed_cols]
     df = df[fixed_cols + other_cols]

@@ -1,8 +1,4 @@
-concurrent.futures
-threading
-itertools
 requests
+mygene
 pandas
-time
-os
-re
+tqdm

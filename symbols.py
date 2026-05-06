@@ -15,9 +15,14 @@ SIZE = 5
 
 def fill_symbols(df, base, taxon_ref):
 
+
+    if "gene_symbol" not in df.columns:
+        df["gene_symbol"] = ""
+
     df["gene_symbol"] = df.apply(
         lambda r:
-        "" if r["gene_name"][:3] == "LOC" and r["gene_biotype"] == "protein_coding"
+        r["gene_symbol"] if r["gene_symbol"]
+        else "" if r["gene_name"][:3] == "LOC" and r["gene_biotype"] == "protein_coding"
         else r["gene_name"],
         axis=1
     )

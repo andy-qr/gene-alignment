@@ -12,10 +12,6 @@ from api import get_thread_key, num_threads
 
 def fill_descriptions(df, base):
 
-    if "description" in df.columns and df["description"].astype(bool).sum() > 0:
-        print("Descriptions already filled — skipping")
-        return df
-
     def fetch_batch(symbols):
         api_key, wait = get_thread_key()
         ids_numeriques = [s.replace("LOC", "") for s in symbols]
@@ -68,9 +64,14 @@ def fill_descriptions(df, base):
 
 
     df_ncbi = pd.DataFrame(results)
+    if df_ncbi.empty:
+        if "description" not in df.columns:
+            df["description"] = ""
+        print("LOC genes descriptions obtained")
+        return df
     id_to_desc = dict(zip(df_ncbi["gene_id"], df_ncbi["description"]))
-
-    df["description"] = df["gene_name"].map(id_to_desc).fillna("")
+    
+    df["description"] = df["gene_name"].map(id_to_desc).fillna(df.get("description", ""))
 
 
     print(f"LOC genes descriptions obtained")

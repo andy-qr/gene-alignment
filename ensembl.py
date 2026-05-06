@@ -10,22 +10,24 @@ def is_ensembl(df):
 
 def ensembl_to_loc(df):
     mg = mygene.MyGeneInfo()
-    ensembl_ids = df["gene_id"].tolist()
+    
+    ensembl_mask = df["gene_id"].str.match(r"^ENS[A-Z]*G\d+").values
+    ensembl_ids = df.loc[ensembl_mask, "gene_id"].tolist()
 
     ensembl_to_ncbi = {}
     ensembl_to_biotype = {}
+    ensembl_to_symbol = {}
     ensembl_to_description = {}
 
     with tqdm(total=3, desc="Converting Ensembl to NCBI IDs",
               bar_format="{desc}: {n}/3 |{bar:30}|",
               ascii=" █", leave=False) as pbar:
 
-        # Étape 1 : MyGene.info
         pbar.set_description("Querying MyGene.info")
         results = mg.querymany(
             ensembl_ids,
             scopes="ensembl.gene",
-            fields="entrezgene,type_of_gene,name",
+            fields="entrezgene,type_of_gene,symbol,name",
             species="all",
             returnall=True,
             verbose=False
@@ -34,45 +36,50 @@ def ensembl_to_loc(df):
             eid = r.get("query")
             ncbi = r.get("entrezgene")
             biotype = r.get("type_of_gene", "")
+            symbol = r.get("symbol", "")
             name = r.get("name", "")
             if ncbi and eid not in ensembl_to_ncbi:
                 ensembl_to_ncbi[eid] = f"LOC{int(ncbi)}"
             if biotype and eid not in ensembl_to_biotype:
                 ensembl_to_biotype[eid] = biotype
+            if symbol and eid not in ensembl_to_symbol:
+                ensembl_to_symbol[eid] = symbol.upper()
             if name and eid not in ensembl_to_description:
-                biotype = ensembl_to_biotype.get(eid, "")
-                if biotype == "protein_coding" or biotype == "1":
-                    ensembl_to_description[eid] = name
+                ensembl_to_description[eid] = name
         pbar.update(1)
 
-        # Étape 2 : fallback Ensembl lookup/id pour les non convertis
         pbar.set_description("Ensembl lookup fallback")
         not_converted = [eid for eid in ensembl_ids if eid not in ensembl_to_ncbi]
 
         for i in range(0, len(not_converted), 1000):
             batch = not_converted[i:i+1000]
-            try:
-                response = requests.post(
-                    "https://rest.ensembl.org/lookup/id",
-                    headers={"Content-Type": "application/json", "Accept": "application/json"},
-                    json={"ids": batch, "expand": 0},
-                    timeout=30
-                )
-                if response.status_code == 200:
-                    for eid, info in response.json().items():
-                        if not info:
-                            continue
-                        biotype = info.get("biotype", "")
-                        name = info.get("display_name", "")
-                        if biotype and eid not in ensembl_to_biotype:
-                            ensembl_to_biotype[eid] = biotype
-                        if name and eid not in ensembl_to_description:
-                            ensembl_to_description[eid] = name
-            except Exception as e:
-                print(f"  Ensembl lookup erreur: {e}")
+            for attempt in range(3):
+                try:
+                    response = requests.post(
+                        "https://rest.ensembl.org/lookup/id",
+                        headers={"Content-Type": "application/json", "Accept": "application/json"},
+                        json={"ids": batch, "expand": 0},
+                        timeout=60
+                    )
+                    if response.status_code == 200:
+                        for eid, info in response.json().items():
+                            if not info:
+                                continue
+                            biotype = info.get("biotype", "")
+                            display = info.get("display_name", "")
+                            if biotype and eid not in ensembl_to_biotype:
+                                ensembl_to_biotype[eid] = biotype
+                            if display and eid not in ensembl_to_symbol:
+                                ensembl_to_symbol[eid] = display.upper()
+                    break
+                except Exception:
+                    if attempt == 2:
+                        print(f"  Ensembl lookup indisponible pour {len(batch)} gènes")
+                    else:
+                        import time
+                        time.sleep(2)
         pbar.update(1)
 
-        # Étape 3 : mapping
         pbar.set_description("Mapping IDs")
 
         biotype_map = {
@@ -90,23 +97,37 @@ def ensembl_to_loc(df):
             "10": "other"
         }
 
-        df["gene_biotype"] = df["gene_id"].map(lambda x: ensembl_to_biotype.get(x, ""))
-        df["description"] = df["gene_id"].map(lambda x: ensembl_to_description.get(x, ""))
-        df["gene_id"] = df["gene_id"].map(lambda x: ensembl_to_ncbi.get(x, x))
-        df["ncbi_id"] = df["gene_id"].apply(
-            lambda x: x.replace("LOC", "") if x.startswith("LOC") else ""
+        if "gene_symbol" not in df.columns:
+            df["gene_symbol"] = ""
+        if "description" not in df.columns:
+            df["description"] = ""
+        if "gene_biotype" not in df.columns:
+            df["gene_biotype"] = ""
+
+        df.loc[ensembl_mask, "gene_biotype"] = df.loc[ensembl_mask, "gene_id"].map(
+            lambda x: ensembl_to_biotype.get(x, "")
         )
-        if df["gene_name"].dropna().head(10).str.match(r"^ENS[A-Z]*G\d+").any():
-            df["gene_name"] = df["gene_id"]
+        df.loc[ensembl_mask, "gene_symbol"] = df.loc[ensembl_mask, "gene_id"].map(
+            lambda x: ensembl_to_symbol.get(x, "")
+        )
+        df.loc[ensembl_mask, "description"] = df.loc[ensembl_mask, "gene_id"].map(
+            lambda x: ensembl_to_description.get(x, "")
+        )
+        df.loc[ensembl_mask, "ncbi_id"] = df.loc[ensembl_mask, "gene_id"].map(
+            lambda x: ensembl_to_ncbi.get(x, "").replace("LOC", "") if ensembl_to_ncbi.get(x, "") else ""
+        )
+        df.loc[ensembl_mask, "gene_id"] = df.loc[ensembl_mask, "gene_id"].map(
+            lambda x: ensembl_to_ncbi.get(x, x)
+        )
 
         df["gene_biotype"] = df["gene_biotype"].astype(str).map(
             lambda x: biotype_map.get(x, x)
         )
         pbar.update(1)
 
-    matched = df["gene_id"].str.startswith("LOC").sum()
-    print(f"✓ {matched}/{len(df)} IDs convertis, "
-          f"{df['description'].astype(bool).sum()} descriptions, "
-          f"{df['gene_biotype'].astype(bool).sum()} biotypes")
+    matched = df.loc[ensembl_mask, "gene_id"].str.startswith("LOC").sum()
+    print(f"✓ {matched}/{len(ensembl_ids)} IDs convertis, "
+          f"{df.loc[ensembl_mask, 'gene_symbol'].astype(bool).sum()} symbols, "
+          f"{df.loc[ensembl_mask, 'description'].astype(bool).sum()} descriptions")
 
     return df
