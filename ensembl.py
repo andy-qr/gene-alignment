@@ -108,10 +108,10 @@ def ensembl_to_loc(df):
             lambda x: ensembl_to_biotype.get(x, "")
         )
         df.loc[ensembl_mask, "gene_symbol"] = df.loc[ensembl_mask, "gene_id"].map(
-            lambda x: ensembl_to_symbol.get(x, "")
+            lambda x: ensembl_to_symbol.get(x, "") if ensembl_to_biotype.get(x, "") == "protein_coding" else ""
         )
         df.loc[ensembl_mask, "description"] = df.loc[ensembl_mask, "gene_id"].map(
-            lambda x: ensembl_to_description.get(x, "")
+            lambda x: ensembl_to_description.get(x, "") if ensembl_to_biotype.get(x, "") == "protein_coding" else ""
         )
         df.loc[ensembl_mask, "ncbi_id"] = df.loc[ensembl_mask, "gene_id"].map(
             lambda x: ensembl_to_ncbi.get(x, "").replace("LOC", "") if ensembl_to_ncbi.get(x, "") else ""

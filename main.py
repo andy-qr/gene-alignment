@@ -18,6 +18,8 @@ def run(TAXON, FILE, output_format="txt"):
     else:
         df = pd.read_csv(FILE, sep="\t")
 
+    df["gene_id"] = df["gene_id"].astype(str)
+    df["gene_name"] = df["gene_name"].astype(str)
 
     if "gene_name" not in df.columns:
         if "gene_id" not in df.columns:

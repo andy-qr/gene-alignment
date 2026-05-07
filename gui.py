@@ -1,6 +1,9 @@
 from taxon import taxon_id, taxon_suggestions
 from tkinter import filedialog, messagebox
 import tkinter as tk
+import threading
+import platform
+import subprocess
 import main
 import json
 import sys
@@ -48,6 +51,30 @@ def load_last_taxon():
 def save_last_taxon(taxon):
     with open(HISTORY_FILE, "w") as f:
         json.dump({"taxon": taxon}, f)
+
+
+def browse_file(file_var):
+    if platform.system() == "Windows":
+        path = filedialog.askopenfilename(
+            title="Select source file",
+            filetypes=[("Supported files", "*.txt *.xlsx *.xls"), ("All files", "*.*")]
+        )
+    else:
+        try:
+            result = subprocess.run(
+                ["zenity", "--file-selection", "--title=Select source file",
+                 "--file-filter=Supported files (txt xlsx xls) | *.txt *.xlsx *.xls",
+                 "--file-filter=All files | *"],
+                capture_output=True, text=True
+            )
+            path = result.stdout.strip() if result.returncode == 0 else ""
+        except FileNotFoundError:
+            path = filedialog.askopenfilename(
+                title="Select source file",
+                filetypes=[("Supported files", "*.txt *.xlsx *.xls"), ("All files", "*.*")]
+            )
+    if path:
+        file_var.set(path)
 
 
 last = load_last_taxon()
@@ -101,17 +128,10 @@ def launch_gui():
     tk.Label(root, text="Source file:").pack(pady=5)
     file_var = tk.StringVar()
 
-    def browse():
-        path = filedialog.askopenfilename(filetypes=[
-            ("Supported files", "*.txt *.xlsx *.xls"),
-            ("All files", "*.*")
-        ])
-        file_var.set(path)
-
     file_frame = tk.Frame(root)
     file_frame.pack()
     tk.Entry(file_frame, textvariable=file_var, width=35).pack(side="left")
-    tk.Button(file_frame, text="Browse", command=browse).pack(side="left", padx=5)
+    tk.Button(file_frame, text="Browse", command=lambda: browse_file(file_var)).pack(side="left", padx=5)
 
     # Format de sortie
     format_var = tk.StringVar(value="txt")
@@ -134,22 +154,32 @@ def launch_gui():
 
         root2 = tk.Tk()
         root2.title("Running...")
-        root2.geometry("800x400")
-        text = tk.Text(root2, state="disabled", width=120, height=23)
-        text.pack()
-        bar_label = tk.Label(root2, text="", font=("Courier", 10), width=120, anchor="w")
-        bar_label.pack()
+        root2.geometry("900x500")
+        root2.minsize(600, 300)
+
+        text = tk.Text(root2, state="disabled", font=("Courier", 10))
+        text.pack(fill="both", expand=True, padx=5, pady=5)
+
+        bar_label = tk.Label(root2, text="", font=("Courier", 10), anchor="w", bg="lightgrey")
+        bar_label.pack(side="bottom", fill="x", padx=5, pady=2)
+
         sys.stdout = TextRedirector(text, bar_label)
         sys.stderr = TextRedirector(text, bar_label)
         root2.protocol("WM_DELETE_WINDOW", lambda: os._exit(0))
         root2.update()
 
-        try:
-            main.run(taxon, filepath, format_var.get())
-        except Exception as e:
-            messagebox.showerror("Error", str(e))
-        sys.stdout = sys.__stdout__
-        sys.stderr = sys.__stderr__
+        def pipeline():
+            try:
+                main.run(taxon, filepath, format_var.get())
+            except Exception as e:
+                err = str(e)
+                root2.after(0, lambda: messagebox.showerror("Error", err))
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
+
+        threading.Thread(target=pipeline, daemon=True).start()
+        root2.mainloop()
 
     tk.Button(root, text="Run", command=run).pack(pady=10)
     root.mainloop()
