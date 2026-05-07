@@ -119,6 +119,9 @@ def ensembl_to_loc(df):
         df.loc[ensembl_mask, "gene_id"] = df.loc[ensembl_mask, "gene_id"].map(
             lambda x: ensembl_to_ncbi.get(x, x)
         )
+        # Remplacer gene_name par LOC+ncbi si gene_name est encore un ID Ensembl et gene_id a été converti
+        ensembl_name_mask = ensembl_mask & df["gene_id"].str.startswith("LOC") & df["gene_name"].str.match(r"^ENS[A-Z]*G\d+")
+        df.loc[ensembl_name_mask, "gene_name"] = df.loc[ensembl_name_mask, "gene_id"]
 
         df["gene_biotype"] = df["gene_biotype"].astype(str).map(
             lambda x: biotype_map.get(x, x)
