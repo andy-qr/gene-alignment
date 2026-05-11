@@ -29,7 +29,7 @@ def fill_descriptions(df, base):
             if gene_name == "uids":
                 continue
             batch_results.append({
-                "gene_id":     "LOC" + gene_name,
+                "ncbi_id":     gene_name,
                 "symbol_ncbi": info.get("name"),
                 "description": info.get("description")
             })
@@ -37,9 +37,9 @@ def fill_descriptions(df, base):
         return batch_results
 
     loc_symbols = df[
-        df["gene_id"].notna() & df["gene_id"].astype(bool) &
+        df["ncbi_id"].notna() & df["ncbi_id"].astype(bool) &
         (df["gene_biotype"] == "protein_coding")
-    ]["gene_id"].tolist()
+    ]["ncbi_id"].tolist()
     batch_size = 100
     total = len(loc_symbols)
     batches = [loc_symbols[i:i + batch_size] for i in range(0, total, batch_size)]

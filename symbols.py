@@ -23,7 +23,7 @@ def fill_symbols(df, base, taxon_ref):
         lambda r:
         r["gene_symbol"] if r["gene_symbol"]
         else "" if r["ncbi_id"] and r["gene_biotype"] == "protein_coding"
-        else "N/A",
+        else "n/a",
         axis=1
     )
 
@@ -146,9 +146,15 @@ def fill_symbols(df, base, taxon_ref):
         pbar.refresh()
 
     df.loc[mask, "gene_symbol"] = df.loc[mask, "description"].map(cache).fillna("")
+
+    print(df.loc[mask, "gene_symbol"].value_counts().head(10))
+    print(f"Cache size: {len(cache)}")
+    print(f"Mask count: {mask.sum()}")
+    print(f"desc_unique count: {len(desc_unique)}")
+
     df["gene_symbol"] = df.apply(
         lambda r: r["gene_symbol"].upper() if r["gene_symbol"]
-        else "N/A",
+        else "n/a",
         axis=1
     )
 
