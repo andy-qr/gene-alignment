@@ -4,6 +4,7 @@ from tqdm import tqdm
 import threading
 import requests
 import time
+import re
 import os
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -22,8 +23,9 @@ def fill_symbols(df, base, taxon_ref):
     df["gene_symbol"] = df.apply(
         lambda r:
         r["gene_symbol"] if r["gene_symbol"]
+        else r["gene_name"] if not re.match(r"^(ENS[A-Z]*G\d+|LOC)", r[gene_name])
         else "" if r["ncbi_id"] and r["gene_biotype"] == "protein_coding"
-        else "n/a",
+        else False,
         axis=1
     )
 

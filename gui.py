@@ -13,8 +13,7 @@ import os
 def get_base_path():
     if getattr(sys, 'frozen', False):
         return os.path.dirname(sys.executable)
-    else:
-        return os.path.dirname(os.path.abspath(__file__))
+    return os.path.dirname(os.path.abspath(__file__))
 
 base_path = get_base_path()
 os.chdir(base_path)
@@ -28,14 +27,16 @@ class TextRedirector:
 
     def write(self, text_content):
         if "\r" in text_content and "\n" not in text_content:
-            self.bar.config(text=text_content.replace("\r", ""))
-            self.bar.update()
+            def _update_bar(t=text_content):
+                self.bar.config(text=t.replace("\r", ""))
+            self.bar.after(0, _update_bar)
         else:
-            self.text.config(state="normal")
-            self.text.insert("end", text_content)
-            self.text.see("end")
-            self.text.config(state="disabled")
-            self.text.update()
+            def _insert(t=text_content):
+                self.text.config(state="normal")
+                self.text.insert("end", t)
+                self.text.see("end")
+                self.text.config(state="disabled")
+            self.text.after(0, _insert)
 
     def flush(self):
         pass
@@ -88,7 +89,6 @@ def launch_gui():
     root.title("Gene Alignment Pipeline")
     root.geometry("440x420")
 
-    # Taxon
     tk.Label(root, text="Studied taxon:").pack(pady=5)
     taxon_var = tk.StringVar(value=TAXONS[0])
     custom_var = tk.StringVar()
@@ -96,8 +96,9 @@ def launch_gui():
     frame.pack()
 
     def on_select():
-        custom_entry.config(state="normal" if taxon_var.get() == "Autre" else "disabled")
-        validate_btn.config(state="normal" if taxon_var.get() == "Autre" else "disabled")
+        state = "normal" if taxon_var.get() == "Autre" else "disabled"
+        custom_entry.config(state=state)
+        validate_btn.config(state=state)
 
     def validate_custom():
         taxon = custom_var.get().strip()
@@ -124,16 +125,13 @@ def launch_gui():
     validate_btn = tk.Button(custom_frame, text="Check", command=validate_custom, state="disabled")
     validate_btn.pack(side="left", padx=5)
 
-    # Fichier source
     tk.Label(root, text="Source file:").pack(pady=5)
     file_var = tk.StringVar()
-
     file_frame = tk.Frame(root)
     file_frame.pack()
     tk.Entry(file_frame, textvariable=file_var, width=35).pack(side="left")
     tk.Button(file_frame, text="Browse", command=lambda: browse_file(file_var)).pack(side="left", padx=5)
 
-    # Format de sortie
     format_var = tk.StringVar(value="txt")
     format_frame = tk.Frame(root)
     format_frame.pack(pady=5)
@@ -141,7 +139,6 @@ def launch_gui():
     tk.Radiobutton(format_frame, text=".txt", variable=format_var, value="txt").pack(side="left")
     tk.Radiobutton(format_frame, text=".xlsx", variable=format_var, value="xlsx").pack(side="left")
 
-    # Bouton Run
     def run():
         taxon = custom_var.get().strip() if taxon_var.get() == "Autre" else taxon_var.get()
         filepath = file_var.get().strip()
@@ -163,8 +160,10 @@ def launch_gui():
         bar_label = tk.Label(root2, text="", font=("Courier", 10), anchor="w", bg="lightgrey")
         bar_label.pack(side="bottom", fill="x", padx=5, pady=2)
 
-        sys.stdout = TextRedirector(text, bar_label)
-        sys.stderr = TextRedirector(text, bar_label)
+        redirector = TextRedirector(text, bar_label)
+        sys.stdout = redirector
+        sys.stderr = redirector
+
         root2.protocol("WM_DELETE_WINDOW", lambda: os._exit(0))
         root2.update()
 

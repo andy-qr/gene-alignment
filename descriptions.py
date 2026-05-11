@@ -37,9 +37,11 @@ def fill_descriptions(df, base):
         return batch_results
 
     loc_symbols = df[
-        df["ncbi_id"].notna() & df["ncbi_id"].astype(bool) &
-        (df["gene_biotype"] == "protein_coding")
+    df["ncbi_id"].notna() & df["ncbi_id"].astype(bool) &
+    (df["gene_biotype"] == "protein_coding") &
+    (df["gene_name"].str.match(r"^(ENS[A-Z]*G\d+|LOC)"))
     ]["ncbi_id"].tolist()
+
     batch_size = 100
     total = len(loc_symbols)
     batches = [loc_symbols[i:i + batch_size] for i in range(0, total, batch_size)]
