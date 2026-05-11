@@ -27,11 +27,10 @@ def fill_cache(df, taxon):
         ~df["gene_symbol"].str.match(r"^ENS[A-Z]*G\d+")
     )
 
-    new = df.loc[symbol_mask, ["gene_name", "gene_id", "gene_symbol"]].copy()
-    new["ensembl_id"] = new["gene_name"].where(
-        new["gene_name"].str.match(r"^ENS[A-Z]*G\d+"), ""
+    new = df.loc[symbol_mask, ["gene_id", "ncbi_id", "gene_symbol"]].copy()
+    new["ensembl_id"] = new["gene_id"].where(
+        new["gene_id"].str.match(r"^ENS[A-Z]*G\d+"), ""
     )
-    new["ncbi_id"] = new["gene_id"].fillna("")
     new = new[["gene_symbol", "ensembl_id", "ncbi_id"]]
 
     cache = load_cache(taxon)

@@ -14,7 +14,7 @@ def fill_descriptions(df, base):
 
     def fetch_batch(symbols):
         api_key, wait = get_thread_key()
-        ids_numeriques = [s.replace("LOC", "") for s in symbols]
+        ids_numeriques = symbols
         summary_r = requests.get(f"{base}/esummary.fcgi", params={
             "db":      "gene",
             "id":      ",".join(ids_numeriques),
@@ -37,9 +37,9 @@ def fill_descriptions(df, base):
         return batch_results
 
     loc_symbols = df[
-        df["gene_name"].str.startswith("LOC") & 
+        df["gene_id"].notna() & df["gene_id"].astype(bool) &
         (df["gene_biotype"] == "protein_coding")
-    ]["gene_name"].tolist()
+    ]["gene_id"].tolist()
     batch_size = 100
     total = len(loc_symbols)
     batches = [loc_symbols[i:i + batch_size] for i in range(0, total, batch_size)]
@@ -69,11 +69,11 @@ def fill_descriptions(df, base):
             df["description"] = ""
         print("LOC genes descriptions obtained")
         return df
-    id_to_desc = dict(zip(df_ncbi["gene_id"], df_ncbi["description"]))
+    id_to_desc = dict(zip(df_ncbi["ncbi_id"], df_ncbi["description"]))
     
-    df["description"] = df["gene_name"].map(id_to_desc).fillna(df.get("description", ""))
+    df["description"] = df["ncbi_id"].map(id_to_desc).fillna(df.get("description", ""))
 
 
-    print(f"LOC genes descriptions obtained")
+    print(f"LOC gene descriptions obtained")
 
     return df

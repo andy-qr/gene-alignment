@@ -45,9 +45,8 @@ def run(TAXON, FILE, output_format="txt", out_dir=None):
     from symbols import fill_symbols
     df = fill_symbols(df, UNIPROT, taxon_id(TAXON_REF)[1])
 
-    df["gene_id"] = df["ncbi_id"]
-    df.drop(columns="ncbi_id", inplace=True)
-    fixed_cols = ["gene_id", "gene_name", "gene_biotype", "gene_symbol", "description"]
+
+    fixed_cols = ["ncbi_id", "gene_id", "gene_name", "gene_biotype", "gene_symbol", "description"]
     other_cols = [c for c in df.columns if c not in fixed_cols]
     df = df[fixed_cols + other_cols]
 
