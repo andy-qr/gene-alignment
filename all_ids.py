@@ -40,14 +40,14 @@ def fill_all_ids(df, base, taxon):
         for batch in loc_batches:
             id_to_biotype.update(fetch_biotype_batch(batch))
         
-        df.loc[df["gene_name"].str.startswith("LOC"), "gene_biotype"] = df.loc[df["gene_id"].str.startswith("LOC"), "gene_name"].map(id_to_biotype)
+        df.loc[df["gene_name"].str.startswith("LOC"), "gene_biotype"] = df.loc[df["gene_name"].str.startswith("LOC"), "gene_name"].map(id_to_biotype)
         
         df.loc[~df["gene_name"].str.startswith("LOC"), "gene_biotype"] = "protein_coding"
 
 
     df["ncbi_id"] = df.apply(
         lambda r:
-        r["gene_name"].replace("LOC", "") if r["gene_id"][:3] == "LOC"
+        r["gene_id"].replace("LOC", "") if r["gene_id"][:3] == "LOC"
         else "",
         axis = 1
     ).astype(str)
