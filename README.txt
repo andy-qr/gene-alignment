@@ -6,7 +6,7 @@ cd <path_to_folder>
 Then type :
 pip install -r requirements.txt
 
-Then you can run the program using
+Then you can run the program in your terminal using
 python gui.py
 
 
