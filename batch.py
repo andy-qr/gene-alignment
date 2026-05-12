@@ -26,7 +26,7 @@ def browse_folder():
 def run_batch(folder, taxon, output_format):
     import main
 
-    supported = (".txt", ".xlsx", ".xls")
+    supported = (".txt", ".xlsx", ".xls", ".ods")
     files = [f for f in os.listdir(folder) if f.endswith(supported)]
 
     if not files:
@@ -81,6 +81,7 @@ def launch_batch_gui():
     tk.Label(format_frame, text="Output format:").pack(side="left")
     tk.Radiobutton(format_frame, text=".txt", variable=format_var, value="txt").pack(side="left")
     tk.Radiobutton(format_frame, text=".xlsx", variable=format_var, value="xlsx").pack(side="left")
+    tk.Radiobutton(format_frame, text=".ods",  variable=format_var, value="ods").pack(side="left")
 
     def run():
         folder = folder_var.get().strip()

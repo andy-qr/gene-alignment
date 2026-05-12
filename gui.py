@@ -1,14 +1,14 @@
 from taxon import taxon_id, taxon_suggestions
 from tkinter import filedialog, messagebox
 import tkinter as tk
+import subprocess
 import threading
 import platform
-import subprocess
+import time
 import main
 import json
 import sys
 import os
-import time
 
 
 def get_base_path():
@@ -59,13 +59,13 @@ def browse_file(file_var):
     if platform.system() == "Windows":
         path = filedialog.askopenfilename(
             title="Select source file",
-            filetypes=[("Supported files", "*.txt *.xlsx *.xls"), ("All files", "*.*")]
+            filetypes=[("Supported files", "*.txt *.xlsx *.xls *.ods"), ("All files", "*.*")]
         )
     else:
         try:
             result = subprocess.run(
                 ["zenity", "--file-selection", "--title=Select source file",
-                 "--file-filter=Supported files (txt xlsx xls) | *.txt *.xlsx *.xls",
+                 "--file-filter=Supported files (txt xlsx xls ods) | *.txt *.xlsx *.xls *.ods",
                  "--file-filter=All files | *"],
                 capture_output=True, text=True
             )
@@ -73,7 +73,7 @@ def browse_file(file_var):
         except FileNotFoundError:
             path = filedialog.askopenfilename(
                 title="Select source file",
-                filetypes=[("Supported files", "*.txt *.xlsx *.xls"), ("All files", "*.*")]
+                filetypes=[("Supported files", "*.txt *.xlsx *.xls *.ods"), ("All files", "*.*")]
             )
     if path:
         file_var.set(path)
@@ -164,6 +164,7 @@ def launch_gui():
     tk.Label(format_frame, text="Output format:").pack(side="left")
     tk.Radiobutton(format_frame, text=".txt",  variable=format_var, value="txt").pack(side="left")
     tk.Radiobutton(format_frame, text=".xlsx", variable=format_var, value="xlsx").pack(side="left")
+    tk.Radiobutton(format_frame, text=".ods",  variable=format_var, value="ods").pack(side="left")
 
     # ── Advanced settings ──────────────────────────────────────────────────
     cache_var     = tk.StringVar(value="use")

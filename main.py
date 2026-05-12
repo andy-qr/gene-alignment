@@ -16,6 +16,8 @@ def run(TAXON, FILE, THRESHOLD, output_format="txt", out_dir=None, cache_mode=Tr
 
     if FILE.endswith(".xlsx") or FILE.endswith(".xls"):
         df = pd.read_excel(FILE)
+    elif FILE.endswith(".ods"):
+        df = pd.read_excel(FILE, engine="odf")
     else:
         df = pd.read_csv(FILE, sep="\t")
 
@@ -63,6 +65,8 @@ def run(TAXON, FILE, THRESHOLD, output_format="txt", out_dir=None, cache_mode=Tr
 
     if output_format == "xlsx":
         df.to_excel(out_base + "_completed.xlsx", index=False)
+    elif output_format == "ods":
+        df.to_excel(out_base + "_completed.ods", index=False, engine="odf")
     else:
         df.to_csv(out_base + "_completed.txt", sep="\t", index=False)
 

@@ -2,4 +2,5 @@ openpyxl
 requests
 mygene
 pandas
+odfpy
 tqdm
