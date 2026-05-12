@@ -8,6 +8,7 @@ import main
 import json
 import sys
 import os
+import time
 
 
 def get_base_path():
@@ -78,6 +79,23 @@ def browse_file(file_var):
         file_var.set(path)
 
 
+def browse_folder(file_var):
+    if platform.system() == "Windows":
+        path = filedialog.askdirectory(title="Select source folder")
+    else:
+        try:
+            result = subprocess.run(
+                ["zenity", "--file-selection", "--directory",
+                 "--title=Select source folder"],
+                capture_output=True, text=True
+            )
+            path = result.stdout.strip() if result.returncode == 0 else ""
+        except FileNotFoundError:
+            path = filedialog.askdirectory(title="Select source folder")
+    if path:
+        file_var.set(path)
+
+
 last = load_last_taxon()
 TAXONS = ["Anas platyrhynchos", "Columba livia", "Gallus gallus", "Taeniopygia guttata"]
 if last and last not in TAXONS:
@@ -87,8 +105,10 @@ if last and last not in TAXONS:
 def launch_gui():
     root = tk.Tk()
     root.title("Gene Alignment Pipeline")
-    root.geometry("440x420")
+    root.geometry("440x500")
+    root.resizable(False, False)
 
+    # ── Taxon ──────────────────────────────────────────────────────────────
     tk.Label(root, text="Studied taxon:").pack(pady=5)
     taxon_var = tk.StringVar(value=TAXONS[0])
     custom_var = tk.StringVar()
@@ -125,26 +145,89 @@ def launch_gui():
     validate_btn = tk.Button(custom_frame, text="Check", command=validate_custom, state="disabled")
     validate_btn.pack(side="left", padx=5)
 
-    tk.Label(root, text="Source file:").pack(pady=5)
+    # ── Source file / folder ───────────────────────────────────────────────
+    source_label = tk.Label(root, text="Source file:")
+    source_label.pack(pady=5)
     file_var = tk.StringVar()
     file_frame = tk.Frame(root)
     file_frame.pack()
-    tk.Entry(file_frame, textvariable=file_var, width=35).pack(side="left")
-    tk.Button(file_frame, text="Browse", command=lambda: browse_file(file_var)).pack(side="left", padx=5)
+    file_entry = tk.Entry(file_frame, textvariable=file_var, width=35)
+    file_entry.pack(side="left")
+    browse_btn = tk.Button(file_frame, text="Browse",
+                           command=lambda: browse_file(file_var))
+    browse_btn.pack(side="left", padx=5)
 
+    # ── Output format ──────────────────────────────────────────────────────
     format_var = tk.StringVar(value="txt")
     format_frame = tk.Frame(root)
     format_frame.pack(pady=5)
     tk.Label(format_frame, text="Output format:").pack(side="left")
-    tk.Radiobutton(format_frame, text=".txt", variable=format_var, value="txt").pack(side="left")
+    tk.Radiobutton(format_frame, text=".txt",  variable=format_var, value="txt").pack(side="left")
     tk.Radiobutton(format_frame, text=".xlsx", variable=format_var, value="xlsx").pack(side="left")
 
+    # ── Advanced settings ──────────────────────────────────────────────────
+    cache_var     = tk.StringVar(value="use")
+    threshold_var = tk.DoubleVar(value=0.25)
+    batch_var     = tk.BooleanVar(value=False)
+    adv_visible   = tk.BooleanVar(value=False)
+
+    adv_frame = tk.LabelFrame(root, text="Advanced settings", padx=8, pady=6)
+
+    tk.Label(adv_frame, text="Cache:").grid(row=0, column=0, sticky="w")
+    tk.Radiobutton(adv_frame, text="Use",    variable=cache_var, value="use").grid(row=0, column=1)
+    tk.Radiobutton(adv_frame, text="Ignore", variable=cache_var, value="ignore").grid(row=0, column=2)
+    tk.Radiobutton(adv_frame, text="Reset",  variable=cache_var, value="reset").grid(row=0, column=3)
+
+    tk.Label(adv_frame, text="Threshold:").grid(row=1, column=0, sticky="w", pady=6)
+    tk.Spinbox(
+        adv_frame, from_=0.0, to=1.0, increment=0.05,
+        textvariable=threshold_var, width=6, format="%.2f"
+    ).grid(row=1, column=1, columnspan=2, sticky="w")
+
+    def on_batch_toggle():
+        if batch_var.get():
+            source_label.config(text="Source folder:")
+            browse_btn.config(command=lambda: browse_folder(file_var))
+            file_var.set("")
+        else:
+            source_label.config(text="Source file:")
+            browse_btn.config(command=lambda: browse_file(file_var))
+            file_var.set("")
+
+    tk.Checkbutton(
+        adv_frame, text="Batch mode (process entire folder)",
+        variable=batch_var, command=on_batch_toggle
+    ).grid(row=2, column=0, columnspan=4, sticky="w", pady=(4, 0))
+
+    def toggle_adv():
+        if adv_visible.get():
+            adv_frame.pack_forget()
+            adv_visible.set(False)
+            adv_btn.config(text="▶ Advanced settings")
+            root.geometry("440x500")
+        else:
+            adv_frame.pack(pady=5, before=run_btn)
+            adv_visible.set(True)
+            adv_btn.config(text="▼ Advanced settings")
+            root.geometry("440x600")
+
+    adv_btn = tk.Button(root, text="▶ Advanced settings", command=toggle_adv, relief="flat")
+    adv_btn.pack(pady=2)
+
+    # ── Run ────────────────────────────────────────────────────────────────
     def run():
-        taxon = custom_var.get().strip() if taxon_var.get() == "Autre" else taxon_var.get()
+        taxon    = custom_var.get().strip() if taxon_var.get() == "Autre" else taxon_var.get()
         filepath = file_var.get().strip()
         if not taxon or not filepath:
             messagebox.showerror("Error", "Fill all fields")
             return
+
+        if cache_var.get() == "reset":
+            from cache import CACHE_DIR
+            if os.path.isdir(CACHE_DIR):
+                ts = time.strftime("%Y%m%d_%H%M%S")
+                os.rename(CACHE_DIR, f"{CACHE_DIR}_backup_{ts}")
+
         if taxon not in TAXONS[:4]:
             save_last_taxon(taxon)
         root.destroy()
@@ -167,20 +250,36 @@ def launch_gui():
         root2.protocol("WM_DELETE_WINDOW", lambda: os._exit(0))
         root2.update()
 
-        def pipeline():
-            try:
-                main.run(taxon, filepath, format_var.get())
-            except Exception as e:
-                err = str(e)
-                root2.after(0, lambda: messagebox.showerror("Error", err))
-            finally:
-                sys.stdout = sys.__stdout__
-                sys.stderr = sys.__stderr__
+        if batch_var.get():
+            def pipeline():
+                try:
+                    from batch import run_batch
+                    run_batch(filepath, taxon, format_var.get())
+                except Exception as e:
+                    err = str(e)
+                    root2.after(0, lambda: messagebox.showerror("Error", err))
+                finally:
+                    sys.stdout = sys.__stdout__
+                    sys.stderr = sys.__stderr__
+        else:
+            def pipeline():
+                try:
+                    main.run(
+                        taxon, filepath, threshold_var.get(), format_var.get(),
+                        cache_mode=cache_var.get(),
+                    )
+                except Exception as e:
+                    err = str(e)
+                    root2.after(0, lambda: messagebox.showerror("Error", err))
+                finally:
+                    sys.stdout = sys.__stdout__
+                    sys.stderr = sys.__stderr__
 
         threading.Thread(target=pipeline, daemon=True).start()
         root2.mainloop()
 
-    tk.Button(root, text="Run", command=run).pack(pady=10)
+    run_btn = tk.Button(root, text="Run", command=run)
+    run_btn.pack(pady=10)
     root.mainloop()
 
 

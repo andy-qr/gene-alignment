@@ -36,15 +36,16 @@ def fill_descriptions(df, base):
         time.sleep(wait)
         return batch_results
 
-    loc_symbols = df[
-    df["ncbi_id"].notna() & df["ncbi_id"].astype(bool) &
-    (df["gene_biotype"] == "protein_coding") &
-    (df["gene_name"].str.match(r"^(ENS[A-Z]*G\d+|LOC)"))
+    desc_ids = df[
+        df["ncbi_id"].notna() & df["ncbi_id"].astype(bool) &            # looking if there is an ncbi_id
+        (df["gene_biotype"] == "protein_coding") &                      # focusing on protein-coding genes for now
+        (df["gene_name"].str.match(r"^(ENS[A-Z]*G\d+|LOC)")) &          # looking in gene_name if it's not already a symbol
+        (df.get("gene_symbol", pd.Series("", index=df.index)) == "")    # skipping if there's already a symbol
     ]["ncbi_id"].tolist()
 
     batch_size = 100
-    total = len(loc_symbols)
-    batches = [loc_symbols[i:i + batch_size] for i in range(0, total, batch_size)]
+    total = len(desc_ids)
+    batches = [desc_ids[i:i + batch_size] for i in range(0, total, batch_size)]
 
     results = []
     results_lock = threading.Lock()
@@ -75,7 +76,5 @@ def fill_descriptions(df, base):
     
     df["description"] = df["ncbi_id"].map(id_to_desc).fillna(df.get("description", ""))
 
-
-    print(f"LOC gene descriptions obtained")
 
     return df

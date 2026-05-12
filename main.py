@@ -1,5 +1,5 @@
 from ensembl import is_ensembl, ensembl_to_loc
-from cache import fill_cache
+from cache import fill_cache, use_cache
 from taxon import taxon_id
 import pandas as pd
 import os
@@ -8,9 +8,10 @@ import os
 TAXON_REF = "Homo sapiens"
 NCBI = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 UNIPROT = "https://rest.uniprot.org/uniprotkb/search"
+NOT_FOUND = "!not found!"
 
 
-def run(TAXON, FILE, output_format="txt", out_dir=None):
+def run(TAXON, FILE, THRESHOLD, output_format="txt", out_dir=None, cache_mode=True):
     from api import num_threads
 
     if FILE.endswith(".xlsx") or FILE.endswith(".xls"):
@@ -33,6 +34,9 @@ def run(TAXON, FILE, output_format="txt", out_dir=None):
     print(f"Using {num_threads} threads")
     print(f"Source file obtained")
 
+    if cache_mode=="use":
+        df = use_cache(df, TAXON)
+
     if is_ensembl(df):
         df = ensembl_to_loc(df)
     else:
@@ -43,7 +47,7 @@ def run(TAXON, FILE, output_format="txt", out_dir=None):
     df = fill_descriptions(df, NCBI)
 
     from symbols import fill_symbols
-    df = fill_symbols(df, UNIPROT, taxon_id(TAXON_REF)[1])
+    df = fill_symbols(df, UNIPROT, taxon_id(TAXON_REF)[1], THRESHOLD, NOT_FOUND)
 
 
     fixed_cols = ["ncbi_id", "gene_id", "gene_name", "gene_biotype", "gene_symbol", "description"]
@@ -62,6 +66,6 @@ def run(TAXON, FILE, output_format="txt", out_dir=None):
     else:
         df.to_csv(out_base + "_completed.txt", sep="\t", index=False)
 
-    fill_cache(df, TAXON)
+    fill_cache(df, TAXON, NOT_FOUND)
 
     print(f"File saved: {out_base}_completed.{output_format}")

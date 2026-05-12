@@ -56,7 +56,7 @@ def fill_all_ids(df, base, taxon):
     mask_missing = (df["ncbi_id"] == "")
     non_loc_symbols = df.loc[mask_missing, "gene_name"].tolist()
 
-    # Découper en batches
+
     batches = [non_loc_symbols[i:i + 100] for i in range(0, len(non_loc_symbols), 100)]
 
     def fetch_ids_batch(symbols):

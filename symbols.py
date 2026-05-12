@@ -10,20 +10,19 @@ import os
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 from api import num_threads, default_wait
 
-THRESHOLD = 0.25
 SIZE = 5
 
 
-def fill_symbols(df, base, taxon_ref):
+def fill_symbols(df, base, taxon_ref, threshold, not_found=""):
 
 
     if "gene_symbol" not in df.columns:
         df["gene_symbol"] = ""
 
-    df["gene_symbol"] = df.apply(
+        df["gene_symbol"] = df.apply(
         lambda r:
         r["gene_symbol"] if r["gene_symbol"]
-        else r["gene_name"] if not re.match(r"^(ENS[A-Z]*G\d+|LOC)", r[gene_name])
+        else r["gene_name"] if not re.match(r"^(ENS[A-Z]*G\d+|LOC)", r["gene_name"])
         else "" if r["ncbi_id"] and r["gene_biotype"] == "protein_coding"
         else False,
         axis=1
@@ -57,7 +56,7 @@ def fill_symbols(df, base, taxon_ref):
                 if score > best_score:
                     best_score = score
                     best_symbol = symbol
-        return best_symbol if best_score >= THRESHOLD else ""
+        return best_symbol if best_score >= threshold else ""
     
     def _fetch(description, exact=True):
         try:
@@ -73,7 +72,7 @@ def fill_symbols(df, base, taxon_ref):
 
             best_symbol = ""
             best_score = 0
-            results_cache = []  # [(symbol, [noms])]
+            results_cache = []
 
             for r in results:
                 if r.get("entryType") != "UniProtKB reviewed (Swiss-Prot)":
@@ -99,7 +98,7 @@ def fill_symbols(df, base, taxon_ref):
                         best_score = score
                         best_symbol = symbol
 
-            return best_symbol if best_score >= THRESHOLD else "", results_cache
+            return best_symbol if best_score >= threshold else "", results_cache
 
         except Exception as e:
             print(f"  Erreur: {e}")
@@ -149,14 +148,10 @@ def fill_symbols(df, base, taxon_ref):
 
     df.loc[mask, "gene_symbol"] = df.loc[mask, "description"].map(cache).fillna("")
 
-    print(df.loc[mask, "gene_symbol"].value_counts().head(10))
-    print(f"Cache size: {len(cache)}")
-    print(f"Mask count: {mask.sum()}")
-    print(f"desc_unique count: {len(desc_unique)}")
 
     df["gene_symbol"] = df.apply(
         lambda r: r["gene_symbol"].upper() if r["gene_symbol"]
-        else "n/a",
+        else not_found,
         axis=1
     )
 
